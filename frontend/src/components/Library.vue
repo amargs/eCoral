@@ -39,9 +39,12 @@ const sundayKind = ref('all')
 const years = reactive({ A: true, B: true, C: true })
 const sunday = ref(null)
 const primeira = ref('')
+const primeiraRef = ref('')
 const segunda = ref('')
+const segundaRef = ref('')
 const salmo = ref('')
 const evangelho = ref('')
+const evangelhoRef = ref('')
 const louvor = ref('')
 const sundayBaseline = ref('')
 const savedMessage = ref('')
@@ -134,9 +137,12 @@ function remember() {
 function sundaySnapshot() {
   const body = {
     primeira: primeira.value,
+    primeiraRef: primeiraRef.value,
     segunda: segunda.value,
+    segundaRef: segundaRef.value,
     salmo: salmo.value,
     evangelho: evangelho.value,
+    evangelhoRef: evangelhoRef.value,
   }
   if (sunday.value?.lenten) body.louvor = louvor.value
   return JSON.stringify(body)
@@ -162,9 +168,12 @@ async function loadSundays() {
 function showSunday(payload) {
   sunday.value = payload
   primeira.value = payload.primeira || ''
+  primeiraRef.value = payload.primeiraRef || ''
   segunda.value = payload.segunda || ''
+  segundaRef.value = payload.segundaRef || ''
   salmo.value = payload.salmo || ''
   evangelho.value = payload.evangelho || ''
+  evangelhoRef.value = payload.evangelhoRef || ''
   louvor.value = payload.louvor || ''
   error.value = ''
   savedNotice.value = false
@@ -197,9 +206,12 @@ async function saveSunday() {
   const body = {
     key: sunday.value.key,
     primeira: primeira.value.trim(),
+    primeiraRef: primeiraRef.value.trim(),
     segunda: segunda.value.trim(),
+    segundaRef: segundaRef.value.trim(),
     salmo: salmo.value.trim(),
     evangelho: evangelho.value.trim(),
+    evangelhoRef: evangelhoRef.value.trim(),
   }
   if (sunday.value.lenten) body.louvor = louvor.value.trim()
   try {
@@ -500,14 +512,16 @@ onUnmounted(() => {
         A próxima Eucaristia lê-as, salvo se as substituir só para essa apresentação.
       </p>
       <div class="readings">
-        <label class="reading">
-          <span>Primeira leitura <em v-if="sunday.primeiraRef">{{ sunday.primeiraRef }}</em></span>
-          <input v-model="primeira" type="text" aria-label="Primeira leitura" />
-        </label>
-        <label class="reading">
-          <span>Segunda leitura <em v-if="sunday.segundaRef">{{ sunday.segundaRef }}</em></span>
-          <input v-model="segunda" type="text" aria-label="Segunda leitura" />
-        </label>
+        <div class="reading">
+          <span>Primeira leitura</span>
+          <input v-model="primeiraRef" type="text" placeholder="Referência" aria-label="Referência da primeira leitura" />
+          <input v-model="primeira" type="text" placeholder="Citação" aria-label="Primeira leitura" />
+        </div>
+        <div class="reading">
+          <span>Segunda leitura</span>
+          <input v-model="segundaRef" type="text" placeholder="Referência" aria-label="Referência da segunda leitura" />
+          <input v-model="segunda" type="text" placeholder="Citação" aria-label="Segunda leitura" />
+        </div>
         <label class="reading">
           <span>Salmo</span>
           <input v-model="salmo" type="text" aria-label="Salmo" />
@@ -516,10 +530,11 @@ onUnmounted(() => {
           <span>Louvor</span>
           <input v-model="louvor" type="text" aria-label="Louvor" />
         </label>
-        <label class="reading">
-          <span>Evangelho <em v-if="sunday.evangelhoRef">{{ sunday.evangelhoRef }}</em></span>
-          <input v-model="evangelho" type="text" aria-label="Evangelho" />
-        </label>
+        <div class="reading">
+          <span>Evangelho</span>
+          <input v-model="evangelhoRef" type="text" placeholder="Referência" aria-label="Referência do Evangelho" />
+          <input v-model="evangelho" type="text" placeholder="Citação" aria-label="Evangelho" />
+        </div>
       </div>
       <div class="catalog-actions">
         <button type="button" :disabled="busy" @click="closeSunday">Cancelar</button>

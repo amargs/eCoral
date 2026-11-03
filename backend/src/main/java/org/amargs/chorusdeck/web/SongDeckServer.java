@@ -123,7 +123,10 @@ public final class SongDeckServer {
                     sentence(body, "segunda"),
                     sentence(body, "salmo"),
                     sentence(body, "evangelho"),
-                    sentence(body, "louvor")));
+                    sentence(body, "louvor"),
+                    sentence(body, "primeiraRef"),
+                    sentence(body, "segundaRef"),
+                    sentence(body, "evangelhoRef")));
         });
         app.get("/api/eucharist-draft", ctx -> {
             JsonNode draft = drafts.readNewSession();

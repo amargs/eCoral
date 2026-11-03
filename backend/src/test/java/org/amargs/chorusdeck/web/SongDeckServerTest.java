@@ -416,15 +416,17 @@ class SongDeckServerTest {
             HttpResponse<String> saved = send(app, HttpRequest.newBuilder(uri(app, "/api/sundays"))
                     .header("Content-Type", "application/json")
                     .PUT(HttpRequest.BodyPublishers.ofString(
-                            "{\"key\":\"ordinary-29/A\",\"primeira\":\"" + sentence + "\"}"))
+                            "{\"key\":\"ordinary-29/A\",\"primeira\":\"" + sentence + "\",\"evangelhoRef\":\"Lc 1, 1\"}"))
                     .build());
             assertEquals(200, saved.statusCode(), saved.body());
             assertEquals(sentence, JSON.readTree(saved.body()).get("primeira").asText());
+            assertEquals("Lc 1, 1", JSON.readTree(saved.body()).get("evangelhoRef").asText());
 
             HttpResponse<String> again = send(app, HttpRequest.newBuilder(
                     uri(app, "/api/liturgy?date=" + LiturgyFixtures.ORDINARY_29)).GET().build());
             assertEquals(200, again.statusCode(), again.body());
             assertEquals(sentence, JSON.readTree(again.body()).get("primeira").get("citacao").asText());
+            assertEquals("Lc 1, 1", JSON.readTree(again.body()).get("versiculo").asText());
 
             HttpResponse<String> missing = send(app, HttpRequest.newBuilder(uri(app, "/api/sundays"))
                     .header("Content-Type", "application/json")

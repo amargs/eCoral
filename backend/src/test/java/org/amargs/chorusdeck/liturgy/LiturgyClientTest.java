@@ -371,6 +371,21 @@ class LiturgyClientTest {
         SundayLibrary.SundayEntry kept = new SundayLibrary(file).replaceSentences(
                 "ordinary-29/A", null, null, null, null, null);
         assertEquals(replaced.primeira(), kept.primeira());
+        assertEquals("Is 45, 1.4-6", kept.primeiraRef());
+
+        SundayLibrary.SundayEntry withVerse = new SundayLibrary(file).replaceSentences(
+                "ordinary-29/A", null, null, null, null, null, "Is 45, 1", null, "Mt 22, 15");
+        assertEquals("Frase nova", withVerse.primeira());
+        assertEquals("Is 45, 1", withVerse.primeiraRef());
+        assertEquals("1Ts 1, 1-5", withVerse.segundaRef());
+        assertEquals("Mt 22, 15", withVerse.evangelhoRef());
+
+        SundayLibrary.SundayEntry fresh = new SundayLibrary(file).replaceSentences(
+                "advent-1/A", "Vigiai", null, null, null, null, "Is 2, 1-5", null, "Mt 24, 37-44");
+        assertEquals("Vigiai", fresh.primeira());
+        assertEquals("Is 2, 1-5", fresh.primeiraRef());
+        assertEquals("", fresh.segundaRef());
+        assertEquals("Mt 24, 37-44", fresh.evangelhoRef());
 
         SundayLibrary.SundayEntry lentDay = new SundayLibrary(file).replaceSentences(
                 "lent-1/B", "Primeira da Quaresma", "Não criar", "Salmo da Quaresma", "Evangelho da Quaresma", "Louvor novo");

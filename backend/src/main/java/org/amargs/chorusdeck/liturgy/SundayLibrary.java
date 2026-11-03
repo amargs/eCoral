@@ -155,13 +155,30 @@ public final class SundayLibrary {
     public SundayEntry replaceSentences(
             String key, String primeira, String segunda, String salmo, String evangelho, String louvor)
             throws IOException {
+        return replaceSentences(key, primeira, segunda, salmo, evangelho, louvor, null, null, null);
+    }
+
+    /**
+     * Replaces sentences and, when a reference is given, that reading's verse.
+     * A null sentence or reference is left as it is. {@code louvor} is written only in Lent.
+     */
+    public SundayEntry replaceSentences(
+            String key,
+            String primeira,
+            String segunda,
+            String salmo,
+            String evangelho,
+            String louvor,
+            String primeiraRef,
+            String segundaRef,
+            String evangelhoRef) throws IOException {
         Lectionary.Entry entry = Lectionary.find(key);
         if (entry == null) {
             throw new IllegalArgumentException("Este domingo não faz parte do ano litúrgico.");
         }
         load();
         ObjectNode sunday = ensure(entry);
-        if (segunda != null && !segunda.isBlank() && !(sunday.get("segunda") instanceof ObjectNode)) {
+        if (readingText(segunda, segundaRef) && !(sunday.get("segunda") instanceof ObjectNode)) {
             sunday.set("segunda", reading(""));
         }
         boolean changed = true;
@@ -169,6 +186,9 @@ public final class SundayLibrary {
         changed |= setCitacao(sunday, "segunda", segunda);
         changed |= setText(sunday, "salmo", salmo);
         changed |= setCitacao(sunday, "evangelho", evangelho);
+        changed |= setReference(sunday, "primeira", primeiraRef);
+        changed |= setReference(sunday, "segunda", segundaRef);
+        changed |= setReference(sunday, "evangelho", evangelhoRef);
         if (entry.lenten()) {
             changed |= setText(sunday, "louvor", louvor);
         }
@@ -176,6 +196,10 @@ public final class SundayLibrary {
             save();
         }
         return entryOf(entry, sunday);
+    }
+
+    private static boolean readingText(String sentence, String referencia) {
+        return (sentence != null && !sentence.isBlank()) || (referencia != null && !referencia.isBlank());
     }
 
     /** Fills blank sentences and references from a solemnity stored on its own key. */
@@ -425,6 +449,13 @@ public final class SundayLibrary {
             return false;
         }
         return setText(reading, "citacao", sentence);
+    }
+
+    private static boolean setReference(ObjectNode sunday, String name, String referencia) {
+        if (!(sunday.get(name) instanceof ObjectNode reading)) {
+            return false;
+        }
+        return setText(reading, "referencia", referencia);
     }
 
     private static boolean setText(ObjectNode node, String field, String sentence) {
