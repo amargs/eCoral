@@ -54,6 +54,13 @@ const libraryFolder = ref('')
 const libraryNote = ref('')
 const libraryBusy = ref(false)
 const importDirectory = ref('')
+const slidesOpen = ref(false)
+const slidesKind = ref('songs')
+const slidesName = ref('cânticos.pptx')
+const slidesInput = ref(null)
+const slidesError = ref('')
+const slidesFileOpen = ref('')
+const slidesReplace = ref('')
 const syncChoice = ref('local')
 const draftFolder = ref('')
 const libraryReady = ref(false)
@@ -566,6 +573,101 @@ async function confirmImport() {
   }
 }
 
+const slidesTitle = computed(() =>
+  slidesKind.value === 'covers' ? 'Exportar todas as capas' : 'Exportar todos os cânticos')
+
+async function openSlides() {
+  await openExport('songs', 'cânticos.pptx')
+}
+
+async function openCovers() {
+  await openExport('covers', 'capas.pptx')
+}
+
+async function openExport(kind, name) {
+  slidesKind.value = kind
+  slidesName.value = name
+  slidesError.value = ''
+  slidesFileOpen.value = ''
+  slidesReplace.value = ''
+  slidesOpen.value = true
+  await nextTick()
+  slidesInput.value?.focus()
+  slidesInput.value?.select()
+}
+
+function closeSlides() {
+  slidesOpen.value = false
+  slidesReplace.value = ''
+  slidesFileOpen.value = ''
+}
+
+async function chooseSlidesFolder() {
+  folderEdited.value = true
+  slidesError.value = ''
+  try {
+    const response = await fetch('/api/choose-folder', { method: 'POST' })
+    const payload = await response.json()
+    if (!response.ok) {
+      throw new Error(payload.error || 'Não foi possível escolher a pasta.')
+    }
+    if (payload.directory) {
+      folder.value = payload.directory
+    }
+  } catch (e) {
+    slidesError.value = e instanceof Error ? e.message : 'Não foi possível escolher a pasta.'
+  }
+}
+
+async function exportSlides(replace = false) {
+  slidesError.value = ''
+  slidesFileOpen.value = ''
+  savedPath.value = ''
+  slidesReplace.value = ''
+  const name = slidesName.value.trim()
+  if (!name) {
+    return
+  }
+  busy.value = true
+  const body = { output: name }
+  if (folder.value) {
+    body.directory = folder.value
+  }
+  if (replace === true) {
+    body.replace = true
+  }
+  try {
+    const covers = slidesKind.value === 'covers'
+    const response = await fetch(covers ? '/api/export-covers' : '/api/export-slides', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    const payload = await response.json()
+    if (payload.exists) {
+      slidesReplace.value = payload.name || name
+      return
+    }
+    if (!response.ok) {
+      throw new Error(payload.error || (covers
+        ? 'Não foi possível exportar as capas.'
+        : 'Não foi possível exportar os cânticos.'))
+    }
+    slidesOpen.value = false
+    slidesReplace.value = ''
+    savedPath.value = payload.output
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'Não foi possível exportar os cânticos.'
+    if (message.includes('ficheiro está aberto')) {
+      slidesFileOpen.value = message
+    } else {
+      slidesError.value = message
+    }
+  } finally {
+    busy.value = false
+  }
+}
+
 async function exportLibrary() {
   error.value = ''
   libraryNote.value = ''
@@ -864,10 +966,66 @@ async function errorText(response) {
           <button type="button" @click="chooseImportFolder">Importar</button>
           <button type="button" @click="exportLibrary">Exportar</button>
         </div>
+        <h3 class="config-heading">Diapositivos</h3>
+        <p class="config-hint">Exportar uma apresentação com todos os cânticos configurados.</p>
+        <p class="config-hint">Ou uma apresentação com todas as capas, cada uma com um texto de exemplo.</p>
+        <div class="config-actions">
+          <button type="button" @click="openSlides">Exportar todos os cânticos</button>
+          <button type="button" @click="openCovers">Exportar todas as capas</button>
+        </div>
       </div>
       <p v-if="libraryNote" class="status">{{ libraryNote }}</p>
       <p v-if="error" class="status error">{{ error }}</p>
     </section>
+    <div v-if="slidesOpen" class="modal-backdrop" @click.self="closeSlides">
+      <div class="modal slides-export" role="dialog" aria-modal="true" aria-labelledby="export-slides" @keydown.esc="closeSlides">
+        <button class="icon close" type="button" aria-label="Fechar" @click="closeSlides">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path d="M6 6l12 12M18 6 6 18" />
+          </svg>
+        </button>
+        <h2 id="export-slides">{{ slidesTitle }}</h2>
+        <div class="export-fields">
+          <label class="field">
+            <span>Ficheiro</span>
+            <input ref="slidesInput" v-model="slidesName" type="text" />
+          </label>
+          <div class="field">
+            <span>Pasta</span>
+            <div class="path-row">
+              <input :value="folder" type="text" readonly placeholder="Nenhuma pasta escolhida" />
+              <button class="browse" type="button" title="Escolher pasta" aria-label="Escolher pasta" @click="chooseSlidesFolder">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <path d="M3 7.5A1.5 1.5 0 0 1 4.5 6H9l2 2h8.5A1.5 1.5 0 0 1 21 9.5v8A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5v-10z" />
+                </svg>
+              </button>
+            </div>
+          </div>
+          <button class="primary" type="button" :disabled="!slidesName.trim() || busy" @click="exportSlides()">
+            <span v-if="busy" class="spinner" aria-hidden="true"></span>
+            {{ busy ? 'A gerar…' : 'Exportar' }}
+          </button>
+        </div>
+        <p v-if="slidesError" class="status error">{{ slidesError }}</p>
+      </div>
+    </div>
+    <div v-if="slidesFileOpen" class="modal-backdrop" @click.self="slidesFileOpen = ''">
+      <div class="modal confirm" role="dialog" aria-modal="true" aria-labelledby="slides-file-open">
+        <p id="slides-file-open" class="file-open">{{ slidesFileOpen }}</p>
+        <div class="open-actions">
+          <button class="primary" type="button" @click="slidesFileOpen = ''">Fechar</button>
+        </div>
+      </div>
+    </div>
+    <div v-if="slidesReplace" class="modal-backdrop" @click.self="slidesReplace = ''">
+      <div class="modal confirm" role="dialog" aria-modal="true" aria-labelledby="replace-slides">
+        <p id="replace-slides">Já existe um ficheiro com o nome {{ slidesReplace }}. Quer substituí-lo?</p>
+        <div class="open-actions">
+          <button type="button" @click="slidesReplace = ''; nextTick(() => { slidesInput?.focus(); slidesInput?.select() })">Escolher outro nome</button>
+          <button class="primary" type="button" @click="exportSlides(true)">Substituir</button>
+        </div>
+      </div>
+    </div>
     <div v-if="importDirectory" class="modal-backdrop" @click.self="cancelImport">
       <div class="modal confirm" role="dialog" aria-modal="true" aria-labelledby="import-library">
         <p id="import-library">Substituir os cânticos e a liturgia pelos ficheiros dessa pasta?</p>

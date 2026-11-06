@@ -138,6 +138,105 @@ public final class DeckService {
         }
     }
 
+    /** Every song that has verses, each language in full, on the Tempo Comum layouts. No cover and no interval. */
+    public Generated generateCatalogue(AppConfig config) throws IOException {
+        BoldMarkup.requireDeckFonts();
+        LOG.info("Found " + BoldMarkup.SEMIBOLD + ", " + BoldMarkup.TITLE + ", " + BoldMarkup.PLAYFAIR + ", " + BoldMarkup.PLAYFAIR_BOLD);
+        DeckFile.ensureWritable(config.outputFile());
+        LOG.info("Checked the output file is writable");
+
+        List<SongCfg> songs = SongIndex.read(config.indexFile());
+        LOG.info("Read index (" + songs.size() + " songs)");
+        List<Picked> runs = catalogueRuns(songs);
+        if (runs.isEmpty()) {
+            throw new IllegalArgumentException("Não há cânticos com letra.");
+        }
+
+        Path parent = config.outputFile().getParent();
+        if (parent != null) {
+            Files.createDirectories(parent);
+        }
+
+        FitCache fits = FitCache.load(config.indexFile().resolveSibling("fit.json"));
+        LOG.info("Loaded fit cache");
+        try (InputStream in = Files.newInputStream(config.template4x3());
+             XMLSlideShow templatePpt = new XMLSlideShow(in)) {
+            LOG.info("Opened template");
+            Season season = Season.resolve("comum", null);
+            XSLFSlideLayout titleLayout = TemplateLayouts.findLayout(templatePpt, season.titleLayout());
+            XSLFSlideLayout lyricLayout = TemplateLayouts.findLayout(templatePpt, TemplateLayouts.LYRICS);
+            TemplateLayouts.setHeaderScheme(titleLayout, season.headerScheme());
+
+            List<Generated.Song> placed = new ArrayList<>();
+            int slideCount = 0;
+            for (Picked picked : runs) {
+                slideCount += appendSong(templatePpt, titleLayout, lyricLayout, fits, picked, placed);
+            }
+
+            DeckFile.write(templatePpt, config.outputFile());
+            LOG.info("Wrote " + config.outputFile().toAbsolutePath() + " (" + slideCount + " slides)");
+            LOG.info("Fit cache: " + fits.reused() + " reused, " + fits.stored() + " new");
+            LOG.info("Generate finished");
+            return new Generated(songs.size(), null, placed, slideCount);
+        } finally {
+            fits.save();
+        }
+    }
+
+    /** One slide for every cover, each with example text. */
+    public Generated generateCovers(AppConfig config) throws IOException {
+        BoldMarkup.requireDeckFonts();
+        LOG.info("Found " + BoldMarkup.SEMIBOLD + ", " + BoldMarkup.TITLE + ", " + BoldMarkup.PLAYFAIR + ", " + BoldMarkup.PLAYFAIR_BOLD);
+        DeckFile.ensureWritable(config.outputFile());
+        LOG.info("Checked the output file is writable");
+
+        Path parent = config.outputFile().getParent();
+        if (parent != null) {
+            Files.createDirectories(parent);
+        }
+
+        try (InputStream in = Files.newInputStream(config.template4x3());
+             XMLSlideShow deck = new XMLSlideShow(in)) {
+            LOG.info("Opened template");
+            int slideCount = 0;
+            for (String name : Season.coverLayouts()) {
+                Cover cover = sampleCover(name);
+                Season season = Season.resolve(cover.season(), cover.cover());
+                XSLFSlide slide = addCover(deck, config.template4x3(), cover, season);
+                TemplateLayouts.keepCoverBackground(slide);
+                slideCount++;
+            }
+            DeckFile.write(deck, config.outputFile());
+            LOG.info("Wrote " + config.outputFile().toAbsolutePath() + " (" + slideCount + " slides)");
+            LOG.info("Generate finished");
+            return new Generated(0, null, List.of(), slideCount);
+        }
+    }
+
+    private static Cover sampleCover(String layout) {
+        String frase = "Bem-aventurados os pobres em espírito";
+        String versiculo = "Mt 5, 3";
+        return switch (layout) {
+            case "Capa - Tempo Comum" -> new Cover("comum", layout, "Domingo XXIX", frase, versiculo, "A");
+            case "Capa - Advento" -> new Cover("advento", layout, "Domingo II", frase, versiculo, "A");
+            case "Capa - Natal" -> new Cover("natal", layout, "Natal do Senhor", frase, versiculo, "A");
+            case "Capa - Quaresma" -> new Cover("quaresma", layout, "Domingo II", frase, versiculo, "A");
+            case "Capa - Domingo III Advento" -> new Cover("advento", layout, "Domingo III", frase, versiculo, "A");
+            case "Capa - Domingo IV Quaresma" -> new Cover("quaresma", layout, "Domingo IV", frase, versiculo, "A");
+            case "Capa - Ramos" -> new Cover("ramos", layout, "Domingo de Ramos", frase, versiculo, "A");
+            case "Capa - Páscoa" -> new Cover("pascoa", layout, "Domingo de Páscoa", frase, versiculo, "A");
+            case "Capa - Pentecostes" -> new Cover("pentecostes", layout, "Domingo de Pentecostes", frase, versiculo, "A");
+            case "Capa - Solenidade" -> new Cover("comum", layout, "Solenidade de Todos os Santos", frase, versiculo, "A");
+            case "Capa - Solenidade Pedro Paulo" -> new Cover(
+                    "comum", layout, "Solenidade dos Apóstolos São Pedro e São Paulo", frase, versiculo, "A");
+            case "Capa - Solenidade Paz" -> new Cover(
+                    "natal", layout, "Solenidade de Santa Maria, Mãe de Deus", frase, versiculo, "A");
+            case "Capa - Maria" -> new Cover("comum", layout, "Solenidade da Assunção da Virgem Santa Maria", frase, versiculo, "A");
+            case "Capa - Taizé" -> new Cover("comum", layout, "Oração de Taizé", frase, versiculo, null, "29/03/2014 | Paróquia de Esgueira");
+            default -> throw new IllegalArgumentException("Unknown cover: " + layout);
+        };
+    }
+
     public Generated generateMass(AppConfig config, MassRequest mass) throws IOException {
         return generateMass(config, mass, Map.of());
     }
@@ -436,7 +535,7 @@ public final class DeckService {
             return slide;
         }
         XSLFPictureData picture = ppt.addPicture(Files.readAllBytes(logo), PictureData.PictureType.PNG);
-        TemplateLayouts.setCoverLogo(layout, picture);
+        TemplateLayouts.setCoverLogo(slide, picture);
         LOG.info("Cover logo " + logo.getFileName());
         return slide;
     }
@@ -535,6 +634,27 @@ public final class DeckService {
     }
 
     private record Picked(String key, SongCfg song) {
+    }
+
+    private static List<Picked> catalogueRuns(List<SongCfg> songs) {
+        List<Picked> runs = new ArrayList<>();
+        for (SongCfg song : songs) {
+            if (hasVerses(song.content())) {
+                runs.add(new Picked(Integer.toString(song.id()), language(song, song.content())));
+            }
+            if (hasVerses(song.contentAlt())) {
+                runs.add(new Picked(Integer.toString(song.id()), language(song, song.contentAlt())));
+            }
+        }
+        return runs;
+    }
+
+    private static boolean hasVerses(List<String> verses) {
+        return verses != null && !verses.isEmpty();
+    }
+
+    private static SongCfg language(SongCfg song, List<String> verses) {
+        return new SongCfg(song.id(), song.title(), verses, song.bookId(), song.titleAlt(), null);
     }
 
     private static List<Picked> pick(List<SongCfg> songs, Selection selection) {

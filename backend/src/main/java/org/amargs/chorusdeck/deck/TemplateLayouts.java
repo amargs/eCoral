@@ -284,21 +284,14 @@ public final class TemplateLayouts {
         paintDomingo(domingo, paint);
     }
 
-    public static void setCoverLogo(XSLFSlideLayout layout, XSLFPictureData picture) throws IOException {
-        XSLFPictureShape logo = null;
-        for (XSLFShape shape : layout.getShapes()) {
-            if (shape instanceof XSLFPictureShape pic && "Picture 4".equals(shape.getShapeName())) {
-                logo = pic;
-                break;
-            }
-        }
-        if (logo == null || !(logo.getXmlObject() instanceof CTPicture ctPicture)) {
-            throw new IllegalArgumentException("Cover logo not found");
-        }
-        Rectangle2D frame = logo.getAnchor();
-        POIXMLDocumentPart.RelationPart rel = layout.addRelation(null, XSLFRelation.IMAGES, picture);
-        ctPicture.getBlipFill().getBlip().setEmbed(rel.getRelationship().getId());
-        logo.setAnchor(fittedAnchor(frame, picture));
+    public static void setCoverLogo(XSLFSlide slide, XSLFPictureData picture) throws IOException {
+        setIntervalPicture(slide, picture);
+    }
+
+    /** The slide keeps the cover background, so a later cover on the same layout does not replace it. */
+    public static void keepCoverBackground(XSLFSlide slide) {
+        CTBackground background = slide.getSlideLayout().getXmlObject().getCSld().getBg();
+        slide.getXmlObject().getCSld().setBg((CTBackground) background.copy());
     }
 
     private static void paintDomingo(CTShape shape, Season.CoverPaint paint) {

@@ -1947,7 +1947,8 @@ button.icon.row-remove:hover {
   height: 1.1rem;
 }
 
-.export .primary {
+.export .primary,
+.modal.slides-export .primary {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1957,7 +1958,13 @@ button.icon.row-remove:hover {
   white-space: nowrap;
 }
 
+.modal.slides-export .primary {
+  justify-self: start;
+}
+
 .spinner {
+  display: inline-block;
+  flex: none;
   width: 0.9rem;
   height: 0.9rem;
   border: 2px solid rgb(255 255 255 / 40%);
@@ -2016,6 +2023,20 @@ button.icon.row-remove:hover {
 
 .modal.confirm {
   width: min(34rem, 100%);
+}
+
+.modal.slides-export {
+  width: min(36rem, 100%);
+  text-align: left;
+}
+
+.modal.slides-export h2 {
+  margin: 0 0 0.85rem;
+  font-size: 1.15rem;
+}
+
+.modal.slides-export .export-fields {
+  grid-template-columns: 1fr;
 }
 
 .modal.confirm.leave-prompt {

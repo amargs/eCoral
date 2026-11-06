@@ -7,9 +7,12 @@ import org.amargs.chorusdeck.index.SongIndex;
 import org.amargs.chorusdeck.web.SongDeckRequests;
 import org.apache.poi.xslf.usermodel.XMLSlideShow;
 import org.apache.poi.xslf.usermodel.XSLFNotes;
+import org.apache.poi.xslf.usermodel.XSLFPictureShape;
 import org.apache.poi.xslf.usermodel.XSLFShape;
 import org.apache.poi.xslf.usermodel.XSLFSlide;
+import org.apache.poi.xslf.usermodel.XSLFSlideLayout;
 import org.apache.poi.xslf.usermodel.XSLFTextShape;
+import org.openxmlformats.schemas.presentationml.x2006.main.CTShape;
 import org.apache.poi.sl.usermodel.Placeholder;
 import org.junit.jupiter.api.Test;
 
@@ -18,6 +21,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -99,6 +103,87 @@ class SlideChoiceTest {
     }
 
     @Test
+    void theCatalogueWritesEveryLanguageOnTheOrdinaryLayouts() throws Exception {
+        Path dir = Files.createTempDirectory("catalogue");
+        Path index = dir.resolve("index.json");
+        SongIndex.write(index, List.of(
+                new SongCfg(1, "Pelos caminhos", List.of("um", "dois"), "12", "Per viam", List.of("unus")),
+                new SongCfg(2, "Sem letra", List.of(), "4"),
+                new SongCfg(3, "Só latim", List.of(), "A1", null, List.of("duo"))));
+        String before = Files.readString(index);
+        Path out = dir.resolve("canticos.pptx");
+        new DeckService().generateCatalogue(new AppConfig(Path.of("unused.pptx"), index, template(), out));
+
+        try (XMLSlideShow ppt = open(out)) {
+            assertEquals(4, ppt.getSlides().size());
+            assertEquals(TemplateLayouts.ORDINARY_TITLE, ppt.getSlides().get(0).getSlideLayout().getName());
+            assertEquals("Pelos caminhos", textShape(ppt.getSlides().get(0), "Título").getText());
+            assertEquals("um", textShape(ppt.getSlides().get(0), "Letra").getText());
+            assertEquals(TemplateLayouts.LYRICS, ppt.getSlides().get(1).getSlideLayout().getName());
+            assertEquals("dois", textShape(ppt.getSlides().get(1), "Letra").getText());
+            assertEquals(TemplateLayouts.ORDINARY_TITLE, ppt.getSlides().get(2).getSlideLayout().getName());
+            assertEquals("Pelos caminhos", textShape(ppt.getSlides().get(2), "Título").getText());
+            assertEquals("unus", textShape(ppt.getSlides().get(2), "Letra").getText());
+            assertEquals(TemplateLayouts.ORDINARY_TITLE, ppt.getSlides().get(3).getSlideLayout().getName());
+            assertEquals("Só latim", textShape(ppt.getSlides().get(3), "Título").getText());
+            assertEquals("duo", textShape(ppt.getSlides().get(3), "Letra").getText());
+            assertEquals("accent1", headerScheme(ppt));
+            assertFalse(slideText(ppt).contains("Per viam"));
+            assertFalse(slideText(ppt).contains("Sem letra"));
+            for (XSLFSlide slide : ppt.getSlides()) {
+                String layout = slide.getSlideLayout().getName();
+                assertFalse(TemplateLayouts.COVER.equals(layout));
+                assertFalse(layout.startsWith("Transição"));
+            }
+        }
+        assertEquals(before, Files.readString(index));
+
+        Path empty = dir.resolve("empty.json");
+        SongIndex.write(empty, List.of(new SongCfg(2, "Sem letra", List.of())));
+        IllegalArgumentException error = assertThrows(
+                IllegalArgumentException.class,
+                () -> new DeckService().generateCatalogue(
+                        new AppConfig(Path.of("unused.pptx"), empty, template(), dir.resolve("vazio.pptx"))));
+        assertTrue(error.getMessage().contains("Não há cânticos com letra."));
+        assertFalse(Files.exists(dir.resolve("vazio.pptx")));
+    }
+
+    @Test
+    void theCoverCatalogueKeepsEachCover() throws Exception {
+        Path dir = Files.createTempDirectory("covers");
+        Path out = dir.resolve("capas.pptx");
+        new DeckService().generateCovers(new AppConfig(Path.of("unused.pptx"), dir.resolve("index.json"), template(), out));
+
+        try (XMLSlideShow ppt = open(out)) {
+            assertEquals(Season.coverLayouts().size(), ppt.getSlides().size());
+            XSLFSlide ordinary = ppt.getSlides().get(0);
+            assertEquals(TemplateLayouts.COVER, ordinary.getSlideLayout().getName());
+            assertEquals("Domingo XXIX", textShape(ordinary, "Domingo").getText());
+            assertEquals("«Bem-aventurados os pobres em espírito»", textShape(ordinary, "Frase").getText());
+            assertEquals("Mt 5, 3", textShape(ordinary, "Versiculo").getText());
+            assertEquals("Tempo Comum · Ano A", textShape(ordinary, "Tempo").getText());
+            String ordinaryBg = ordinary.getXmlObject().getCSld().getBg().xmlText();
+            assertTrue(ordinaryBg.contains("accent1"), ordinaryBg);
+
+            XSLFSlide advent = ppt.getSlides().get(1);
+            assertEquals("Domingo II", textShape(advent, "Domingo").getText());
+            assertEquals("Tempo de Advento · Ano A", textShape(advent, "Tempo").getText());
+            String adventBg = advent.getXmlObject().getCSld().getBg().xmlText();
+            assertTrue(adventBg.contains("accent2"), adventBg);
+            assertEquals(1, pictureCount(ordinary));
+            assertEquals(0, pictureCount(ordinary.getSlideLayout()));
+            assertArrayEquals(logo("logo_comum.png"), slideLogo(ordinary));
+            assertArrayEquals(logo("logo_advento.png"), slideLogo(advent));
+            assertEquals(1, pictureCount(advent));
+
+            XSLFSlide taize = ppt.getSlides().get(ppt.getSlides().size() - 1);
+            assertEquals("Oração de Taizé", textShape(taize, "Domingo").getText());
+            assertEquals("29/03/2014 | Paróquia de Esgueira", textShape(taize, "Tempo").getText());
+            assertTrue(taize.getXmlObject().getCSld().getBg().xmlText().toLowerCase().contains("e37931"));
+        }
+    }
+
+    @Test
     void aSongRequestCarriesTheChoiceAndUsesTheDefaultLanguage() throws Exception {
         List<SongCfg> songs = List.of(new SongCfg(
                 1, "Pelos caminhos", List.of("um", "dois"), "12", "Per viam", List.of("unus")));
@@ -158,6 +243,39 @@ class SlideChoiceTest {
             assertFalse(slideText(ppt).contains("Glória"));
         }
         assertEquals(before, Files.readString(index));
+    }
+
+    private static byte[] slideLogo(XSLFSlide slide) {
+        for (XSLFShape shape : slide.getShapes()) {
+            if (shape instanceof XSLFPictureShape picture) {
+                return picture.getPictureData().getData();
+            }
+        }
+        throw new IllegalStateException("Cover logo not found");
+    }
+
+    private static int pictureCount(org.apache.poi.xslf.usermodel.XSLFSheet sheet) {
+        int count = 0;
+        for (XSLFShape shape : sheet.getShapes()) {
+            if (shape instanceof XSLFPictureShape) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    private static byte[] logo(String name) throws Exception {
+        return Files.readAllBytes(template().toAbsolutePath().normalize().getParent().resolve("../../assets").resolve(name).normalize());
+    }
+
+    private static String headerScheme(XMLSlideShow ppt) {
+        XSLFSlideLayout layout = TemplateLayouts.findLayout(ppt, TemplateLayouts.ORDINARY_TITLE);
+        for (XSLFShape shape : layout.getShapes()) {
+            if ("Header".equals(shape.getShapeName()) && shape.getXmlObject() instanceof CTShape ctShape) {
+                return ctShape.getSpPr().getSolidFill().getSchemeClr().getVal().toString();
+            }
+        }
+        throw new IllegalStateException("Header not found");
     }
 
     private static String notes(XSLFSlide slide) {

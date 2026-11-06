@@ -584,6 +584,47 @@ class SongDeckServerTest {
         }
     }
 
+    @Test
+    void exportSlidesWritesTheCatalogueBesideTheChosenFolder() throws Exception {
+        Path dir = Files.createTempDirectory("chorus-deck");
+        Path index = dir.resolve("index.json");
+        SongIndex.write(index, List.of(new SongCfg(1, "Pelos caminhos", List.of("um"), "12")));
+        String before = Files.readString(index);
+        Javalin app = app(dir, index);
+        try {
+            HttpResponse<String> written = send(app, HttpRequest.newBuilder(uri(app, "/api/export-slides"))
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString("{\"output\":\"canticos.pptx\"}"))
+                    .build());
+            assertEquals(200, written.statusCode());
+            Path output = dir.resolve("canticos.pptx");
+            assertEquals(output.toAbsolutePath().normalize().toString(), JSON.readTree(written.body()).get("output").asText());
+            assertEquals(before, Files.readString(index));
+        } finally {
+            app.stop();
+        }
+    }
+
+    @Test
+    void exportCoversWritesTheSampleDeck() throws Exception {
+        Path dir = Files.createTempDirectory("chorus-deck");
+        Path index = dir.resolve("index.json");
+        SongIndex.write(index, List.of(new SongCfg(1, "Pelos caminhos", List.of("um"), "12")));
+        Javalin app = app(dir, index);
+        try {
+            HttpResponse<String> written = send(app, HttpRequest.newBuilder(uri(app, "/api/export-covers"))
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString("{\"output\":\"capas.pptx\"}"))
+                    .build());
+            assertEquals(200, written.statusCode());
+            assertEquals(
+                    dir.resolve("capas.pptx").toAbsolutePath().normalize().toString(),
+                    JSON.readTree(written.body()).get("output").asText());
+        } finally {
+            app.stop();
+        }
+    }
+
     private static Javalin app(Path dir, Path index) throws Exception {
         return app(dir, index, true);
     }

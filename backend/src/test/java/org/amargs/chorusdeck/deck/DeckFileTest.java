@@ -28,6 +28,20 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class DeckFileTest {
 
     @Test
+    void writtenDeckOpensOnTheSlides() throws Exception {
+        Path out = Files.createTempDirectory("chorus-deck-view").resolve("deck.pptx");
+        try (var in = Files.newInputStream(template()); XMLSlideShow ppt = new XMLSlideShow(in)) {
+            DeckFile.write(ppt, out);
+        }
+        String view;
+        try (FileSystem zip = FileSystems.newFileSystem(out)) {
+            view = Files.readString(zip.getPath("/ppt/viewProps.xml"));
+        }
+        assertTrue(view.contains("lastView=\"sldView\""), view);
+        assertFalse(view.contains("sldMasterView"));
+    }
+
+    @Test
     void writtenDeckThumbnailIsTheFirstSlide() throws Exception {
         Path dir = Files.createTempDirectory("chorus-deck-thumb");
         Path out = dir.resolve("deck.pptx");

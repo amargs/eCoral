@@ -1166,12 +1166,19 @@ class TemplateLayoutsTest {
     }
 
     private static byte[] coverLogo(XSLFSlide cover) {
-        for (XSLFShape shape : cover.getSlideLayout().getShapes()) {
-            if (shape instanceof XSLFPictureShape picture && "Picture 4".equals(picture.getShapeName())) {
-                return picture.getPictureData().getData();
+        XSLFPictureShape found = null;
+        for (XSLFShape shape : cover.getShapes()) {
+            if (shape instanceof XSLFPictureShape picture) {
+                if (found != null) {
+                    throw new IllegalStateException("More than one cover logo");
+                }
+                found = picture;
             }
         }
-        throw new IllegalStateException("Cover logo not found");
+        if (found == null || found.getPictureData() == null) {
+            throw new IllegalStateException("Cover logo not found");
+        }
+        return found.getPictureData().getData();
     }
 
     private static XSLFTextShape textShape(XSLFSlide slide, String name) {

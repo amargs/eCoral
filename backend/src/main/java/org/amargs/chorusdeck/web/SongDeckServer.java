@@ -245,6 +245,44 @@ public final class SongDeckServer {
                 throw new IOException(message == null || message.isBlank() ? "Could not open the folder chooser." : message, e);
             }
         });
+        app.post("/api/export-slides", ctx -> {
+            JsonNode body = readObject(ctx.body(), "The export request must be an object.");
+            Path index = library.requireIndex();
+            Path besideIndex = index.getParent() == null ? stateDirectory : index.getParent();
+            Path output = LocalFiles.deckFile(text(body, "output"), LocalFiles.folder(text(body, "directory"), besideIndex));
+            if (!body.path("replace").asBoolean(false) && Files.isRegularFile(output)) {
+                ctx.status(409).json(Map.of(
+                        "exists", true,
+                        "name", output.getFileName().toString()));
+                return;
+            }
+            DeckService.Generated generated = new DeckService().generateCatalogue(
+                    new AppConfig(null, index, PackagedTemplate.file(), null).withOutput(output));
+            Path written = output.toAbsolutePath().normalize();
+            lastOutput.set(written);
+            ctx.json(Map.of(
+                    "output", written.toString(),
+                    "slides", generated.slides()));
+        });
+        app.post("/api/export-covers", ctx -> {
+            JsonNode body = readObject(ctx.body(), "The export request must be an object.");
+            Path index = library.requireIndex();
+            Path besideIndex = index.getParent() == null ? stateDirectory : index.getParent();
+            Path output = LocalFiles.deckFile(text(body, "output"), LocalFiles.folder(text(body, "directory"), besideIndex));
+            if (!body.path("replace").asBoolean(false) && Files.isRegularFile(output)) {
+                ctx.status(409).json(Map.of(
+                        "exists", true,
+                        "name", output.getFileName().toString()));
+                return;
+            }
+            DeckService.Generated generated = new DeckService().generateCovers(
+                    new AppConfig(null, index, PackagedTemplate.file(), null).withOutput(output));
+            Path written = output.toAbsolutePath().normalize();
+            lastOutput.set(written);
+            ctx.json(Map.of(
+                    "output", written.toString(),
+                    "slides", generated.slides()));
+        });
         app.post("/api/generate", ctx -> {
             JsonNode body;
             try {
