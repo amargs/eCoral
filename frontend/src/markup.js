@@ -10,7 +10,9 @@ export function markupToHtml(markup) {
 export function htmlToMarkup(root) {
   const parts = []
   walk(root, { bold: false, italic: false, underline: false }, parts, true)
-  return parts.map((part) => (part.break ? '\n' : wrap(part.text, part.style))).join('').replace(/\u00a0/g, ' ')
+  return parts.map((part) => (part.break ? '\n' : wrap(part.text, part.style))).join('')
+    .replace(/\u00a0/g, ' ')
+    .replace(/^\n+|\n+$/g, '')
 }
 
 function renderLine(line) {
@@ -71,8 +73,13 @@ function walk(node, style, parts, isRoot) {
   if (block && parts.length && !parts[parts.length - 1].break) {
     pushBreak(parts)
   }
+  const at = parts.length
   for (const child of node.childNodes) {
     walk(child, next, parts, false)
+  }
+  // An empty block is a blank line. A <br> inside it already contributed that break.
+  if (block && parts.length === at) {
+    pushBreak(parts)
   }
 }
 
@@ -97,7 +104,6 @@ function pushText(parts, text, style) {
 }
 
 function pushBreak(parts) {
-  if (parts[parts.length - 1]?.break) return
   parts.push({ break: true })
 }
 
