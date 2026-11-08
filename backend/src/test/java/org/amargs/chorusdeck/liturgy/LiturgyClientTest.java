@@ -129,7 +129,7 @@ class LiturgyClientTest {
 
         LiturgyDay assumption = client.load(LocalDate.of(2026, 8, 15), file);
         assertEquals("Solenidade da Assunção da Virgem Santa Maria", assumption.domingo());
-        assertEquals("Capa - Solenidade", assumption.coverLayout());
+        assertEquals("Capa - Maria", assumption.coverLayout());
         assertEquals("comum", assumption.seasonKey());
         assertEquals("A", assumption.ano());
         assertEquals("", assumption.primeira().citacao());
@@ -138,6 +138,7 @@ class LiturgyClientTest {
 
         LiturgyDay immaculate = client.load(LocalDate.of(2026, 12, 8), file);
         assertEquals("Solenidade da Imaculada Conceição da Virgem Santa Maria", immaculate.domingo());
+        assertEquals("Capa - Maria", immaculate.coverLayout());
         assertEquals("advento", immaculate.seasonKey());
 
         LiturgyDay mary = client.load(LocalDate.of(2026, 1, 1), file);

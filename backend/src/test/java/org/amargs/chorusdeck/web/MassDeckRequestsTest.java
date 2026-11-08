@@ -180,7 +180,7 @@ class MassDeckRequestsTest {
         LiturgyClient.SundaySolemnity kept = LiturgyClient.sundayOverlap(immaculate.date(), immaculate.seasonKey());
         Map<String, Object> advent = solemnity(immaculate);
         assertEquals(false, advent.get("outranks"));
-        assertEquals("accent4", advent.get("accent"));
+        assertEquals("accent6", advent.get("accent"));
         assertEquals("O Domingo 08/12/2024 é também " + kept.title() + ". No entanto, a liturgia de "
                 + immaculate.domingo() + " do tempo de Advento prevalece sobre esta festa/solenidade.",
                 advent.get("warning"));

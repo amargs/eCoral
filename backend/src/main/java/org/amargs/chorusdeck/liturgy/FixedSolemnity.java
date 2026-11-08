@@ -6,6 +6,7 @@ final class FixedSolemnity {
     static final String WHITE_COVER = "Capa - Solenidade";
     static final String PETER_PAUL_COVER = "Capa - Solenidade Pedro Paulo";
     static final String PEACE_COVER = "Capa - Solenidade Paz";
+    static final String MARIA_COVER = "Capa - Maria";
 
     private final String key;
     private final String apiName;
@@ -58,14 +59,14 @@ final class FixedSolemnity {
                     "assumption",
                     "The Assumption of the Blessed Virgin Mary",
                     "Solenidade da Assunção da Virgem Santa Maria",
-                    WHITE_COVER,
+                    MARIA_COVER,
                     8, 15),
             new FixedSolemnity("all-saints", "All Saints", "Solenidade de Todos os Santos", WHITE_COVER, 11, 1),
             new FixedSolemnity(
                     "immaculate-conception",
                     "The Immaculate Conception of the Blessed Virgin Mary",
                     "Solenidade da Imaculada Conceição da Virgem Santa Maria",
-                    WHITE_COVER,
+                    MARIA_COVER,
                     12, 8)
     };
 
