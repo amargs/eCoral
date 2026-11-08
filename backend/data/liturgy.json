@@ -13,7 +13,7 @@
     "2027-03-14" : "lent-5/B",
     "2027-04-25" : "easter-5/B",
     "2027-07-25" : "ordinary-17/B",
-    "2024-12-08" : "advent-3/C",
+    "2024-12-08" : "advent-2/C",
     "2026-11-29" : "advent-1/B",
     "2026-11-01" : "ordinary-31/A",
     "2026-11-15" : "ordinary-33/A",
@@ -24,7 +24,12 @@
     "2026-11-08" : "ordinary-32/A",
     "2026-08-16" : "ordinary-20/A",
     "2027-01-10" : "baptism-of-the-lord/B",
-    "2027-02-14" : "lent-1/B"
+    "2027-02-14" : "lent-1/B",
+    "2026-11-22" : "ordinary-34/A",
+    "2026-06-14" : "ordinary-11/A",
+    "2026-05-24" : "pentecost/A",
+    "2026-08-09" : "ordinary-19/A",
+    "2025-12-07" : "advent-2/A"
   },
   "sundays" : {
     "ordinary-29/A" : {
@@ -492,6 +497,91 @@
       },
       "segunda" : {
         "referencia" : "",
+        "citacao" : ""
+      }
+    },
+    "ordinary-34/A" : {
+      "domingo" : "Solenidade de Nosso Senhor Jesus Cristo, Rei do Universo",
+      "season" : "comum",
+      "primeira" : {
+        "referencia" : "Ez 34, 11-12, 15-17",
+        "citacao" : ""
+      },
+      "segunda" : {
+        "referencia" : "1Cor 15, 20-26, 28",
+        "citacao" : ""
+      },
+      "salmo" : "",
+      "evangelho" : {
+        "referencia" : "Mt 25, 31-46",
+        "citacao" : ""
+      }
+    },
+    "ordinary-11/A" : {
+      "domingo" : "Domingo XI",
+      "season" : "comum",
+      "primeira" : {
+        "referencia" : "Ex 19, 2-6",
+        "citacao" : ""
+      },
+      "segunda" : {
+        "referencia" : "Rm 5, 6-11",
+        "citacao" : ""
+      },
+      "salmo" : "",
+      "evangelho" : {
+        "referencia" : "Mt 9, 36-10, 8",
+        "citacao" : ""
+      }
+    },
+    "pentecost/A" : {
+      "domingo" : "Domingo de Pentecostes",
+      "season" : "pentecostes",
+      "primeira" : {
+        "referencia" : "At 2, 1-11",
+        "citacao" : ""
+      },
+      "segunda" : {
+        "referencia" : "1Cor 12, 3-7, 12-13",
+        "citacao" : ""
+      },
+      "salmo" : "",
+      "evangelho" : {
+        "referencia" : "Jo 20, 19-23",
+        "citacao" : ""
+      }
+    },
+    "ordinary-19/A" : {
+      "domingo" : "Domingo XIX",
+      "season" : "comum",
+      "primeira" : {
+        "referencia" : "1Rs 19, 9, 11-13",
+        "citacao" : ""
+      },
+      "segunda" : {
+        "referencia" : "Rm 9, 1-5",
+        "citacao" : ""
+      },
+      "salmo" : "",
+      "evangelho" : {
+        "referencia" : "Mt 14, 22-33",
+        "citacao" : ""
+      }
+    },
+    "advent-2/A" : {
+      "domingo" : "Domingo II",
+      "season" : "advento",
+      "primeira" : {
+        "referencia" : "Is 11, 1-10",
+        "citacao" : ""
+      },
+      "segunda" : {
+        "referencia" : "Rm 15, 4-9",
+        "citacao" : ""
+      },
+      "salmo" : "",
+      "evangelho" : {
+        "referencia" : "Mt 3, 1-12",
         "citacao" : ""
       }
     }

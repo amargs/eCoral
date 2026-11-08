@@ -160,6 +160,16 @@ public final class Lectionary {
         };
     }
 
+    /** The name shown when searching for a day. Numbered Sundays read "Domingo III da Páscoa". */
+    static String menuName(String id) {
+        String titled = name(id);
+        int split = titled.indexOf(" Domingo ");
+        if (split > 0 && titled.substring(0, split).matches("[IVXL]+")) {
+            return "Domingo " + titled.substring(0, split) + titled.substring(split + " Domingo".length());
+        }
+        return titled;
+    }
+
     /** The title stored for the cover. Numbered Sundays stay "Domingo II". */
     private static String coverTitle(String id) {
         String stored = SundayLibrary.domingo(id);

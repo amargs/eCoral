@@ -117,6 +117,72 @@ const lenten = computed(() => (
 
 const accentChoice = computed(() => ACCENTS.find((item) => item.id === accent.value) || ACCENTS[0])
 
+const celebrations = ref([])
+const celebrationSpan = ref({ from: '', until: '' })
+const dayOpen = ref(false)
+const dayFiltering = ref(false)
+const dayCursor = ref(0)
+const dayMenuWidth = ref(0)
+let daySnapshot = ''
+
+const dayLine = computed(() => {
+  const parts = []
+  if (liturgy.value?.ano) {
+    parts.push(`Ano ${liturgy.value.ano}`)
+  }
+  if (seasonLabel.value) {
+    parts.push(seasonLabel.value)
+  }
+  if (liturgy.value) {
+    parts.push(accentChoice.value.name.toLowerCase())
+  }
+  return parts.join(' · ')
+})
+
+function foldDay(value) {
+  return (value || '').normalize('NFD').replace(/\p{M}/gu, '').toLowerCase()
+}
+
+const dayOrder = computed(() => {
+  const days = celebrations.value
+  const now = new Date()
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+  const start = days.findIndex((day) => day.date >= today)
+  if (start <= 0) {
+    return days
+  }
+  return days.slice(start).concat(days.slice(0, start))
+})
+
+const dayMatches = computed(() => {
+  if (!dayFiltering.value) {
+    return dayOrder.value
+  }
+  const words = foldDay(form.domingo).split(/\s+/).filter(Boolean)
+  if (!words.length) {
+    return dayOrder.value
+  }
+  return dayOrder.value.filter((day) => {
+    const tokens = foldDay(dayLabel(day)).split(/\s+/).filter(Boolean)
+    return words.every((word) => tokens.some((token) => dayToken(token, word)))
+  })
+})
+
+const dayHint = computed(() => (
+  dayFiltering.value && !dayMatches.value.length ? 'Nenhum dia com esse nome.' : ''
+))
+
+function dayLabel(day) {
+  return day.ano ? `${day.name} · Ano ${day.ano}` : day.name
+}
+
+function dayToken(token, word) {
+  if (/^[ivx]+$/.test(word)) {
+    return token === word
+  }
+  return token.startsWith(word)
+}
+
 const coverLabel = computed(() => COVERS.find((item) => item.id === cover.value)?.label || cover.value)
 
 const liturgyUrl = computed(() => {
@@ -358,14 +424,135 @@ function showAccent(id) {
   accent.value = swatch.id
 }
 
-function pickAccent(id) {
-  accentTouched.value = true
-  showAccent(id)
+function currentDayIndex() {
+  const index = dayMatches.value.findIndex((day) => day.date === date.value)
+  return index < 0 ? 0 : index
+}
+
+async function loadCelebrations(forDate) {
+  if (!forDate) {
+    return
+  }
+  const span = celebrationSpan.value
+  if (span.from && forDate >= span.from && forDate <= span.until && celebrations.value.length) {
+    return
+  }
+  try {
+    const response = await fetch('/api/celebrations?date=' + encodeURIComponent(forDate))
+    if (!response.ok) {
+      return
+    }
+    const payload = await response.json()
+    celebrations.value = payload.days || []
+    celebrationSpan.value = { from: payload.from || '', until: payload.until || '' }
+    if (dayOpen.value && !dayFiltering.value) {
+      placeDayCursor(currentDayIndex())
+    }
+  } catch {
+    // The date still fills the day when the list cannot be read.
+  }
+}
+
+function placeDayCursor(index) {
+  const count = dayMatches.value.length
+  dayCursor.value = count === 0 ? 0 : Math.min(Math.max(index, 0), count - 1)
+  nextTick(() => {
+    document.getElementById('day-matches')?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'center' })
+  })
+}
+
+function sizeDayMenu() {
+  nextTick(() => {
+    if (!dayOpen.value || dayFiltering.value) {
+      return
+    }
+    const menu = document.getElementById('day-matches')
+    if (!menu) {
+      return
+    }
+    dayMenuWidth.value = menu.offsetWidth
+  })
+}
+
+function onDayFocus(event) {
+  daySnapshot = form.domingo
+  dayFiltering.value = false
+  dayOpen.value = true
+  event.target.select()
+  sizeDayMenu()
+  nextTick(() => {
+    if (dayFiltering.value) {
+      return
+    }
+    placeDayCursor(currentDayIndex())
+  })
+}
+
+function onDayInput() {
+  if (form.domingo === daySnapshot) {
+    return
+  }
+  dayFiltering.value = true
+  dayOpen.value = true
+  placeDayCursor(0)
+}
+
+function onDayToggle() {
+  const field = document.getElementById('day-field')
+  if (document.activeElement !== field) {
+    field?.focus()
+    return
+  }
+  dayOpen.value = !dayOpen.value
+  if (!dayOpen.value) {
+    return
+  }
+  dayFiltering.value = false
+  sizeDayMenu()
+  placeDayCursor(currentDayIndex())
+}
+
+function onDayBlur() {
+  window.setTimeout(() => {
+    const root = document.querySelector('.day-search')
+    if (!root?.contains(document.activeElement)) {
+      dayOpen.value = false
+    }
+  }, 0)
+}
+
+function pickDay(item) {
+  dayOpen.value = false
+  if (item.date !== date.value) {
+    date.value = item.date
+    return
+  }
+  form.domingo = daySnapshot
+}
+
+function onDayKey(event) {
+  const matches = dayMatches.value
+  if (event.key === 'ArrowDown') {
+    event.preventDefault()
+    dayOpen.value = true
+    dayCursor.value = Math.min(dayCursor.value + 1, Math.max(matches.length - 1, 0))
+  } else if (event.key === 'ArrowUp') {
+    event.preventDefault()
+    dayOpen.value = true
+    dayCursor.value = Math.max(dayCursor.value - 1, 0)
+  } else if (event.key === 'Enter' && dayOpen.value && matches[dayCursor.value]) {
+    event.preventDefault()
+    pickDay(matches[dayCursor.value])
+  } else if (event.key === 'Escape') {
+    form.domingo = daySnapshot
+    dayOpen.value = false
+  }
 }
 
 async function loadLiturgy() {
   const requested = date.value
   const token = ++liturgyRequest
+  loadCelebrations(requested)
   loading.value = true
   accentTouched.value = false
   readingsOpen.value = false
@@ -812,45 +999,69 @@ async function generate(force = false, replace = false) {
   <div class="deck">
     <header class="mass-head">
       <div class="specimen">
-        <h1>
-          <input
-            v-model="form.domingo"
-            type="text"
-            :disabled="!liturgy"
-            :aria-label="useSolemnity ? 'Título' : 'Domingo'"
-            :placeholder="loading ? 'A ler a liturgia…' : 'Domingo'"
-          />
-        </h1>
+        <div class="day-search" :class="{ open: dayOpen }" :style="dayOpen && dayMenuWidth ? { minWidth: dayMenuWidth + 'px' } : undefined">
+          <h1>
+            <input
+              id="day-field"
+              v-model="form.domingo"
+              type="text"
+              role="combobox"
+              :aria-expanded="dayOpen"
+              aria-controls="day-matches"
+              aria-autocomplete="list"
+              :disabled="!liturgy"
+              :aria-label="useSolemnity ? 'Título' : 'Domingo, escrever para procurar outro'"
+              :placeholder="loading ? 'A ler a liturgia…' : 'Domingo'"
+              @focus="onDayFocus"
+              @input="onDayInput"
+              @click="dayOpen = true"
+              @blur="onDayBlur"
+              @keydown="onDayKey"
+            />
+            <button
+              type="button"
+              class="day-toggle"
+              :aria-expanded="dayOpen"
+              aria-controls="day-matches"
+              aria-label="Procurar um domingo"
+              :disabled="!liturgy"
+              @mousedown.prevent
+              @click="onDayToggle"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M6 9l6 6 6-6" />
+              </svg>
+            </button>
+          </h1>
+          <Transition name="day-menu">
+          <ul v-show="dayOpen" id="day-matches" class="day-matches" role="listbox">
+            <li v-if="dayHint" class="day-hint" @mousedown.prevent>{{ dayHint }}</li>
+            <li v-for="(item, index) in dayMatches" :key="item.date + item.key">
+              <button
+                type="button"
+                role="option"
+                :aria-selected="index === dayCursor"
+                @mousedown.prevent
+                @click="pickDay(item)"
+              >
+                <span>{{ dayLabel(item) }}</span>
+              </button>
+            </li>
+          </ul>
+          </Transition>
+        </div>
         <p class="catalog">
           <label>
             Data
             <input v-model.lazy="date" type="date" />
           </label>
-          <span v-if="liturgy?.ano && seasonLabel">Ano {{ liturgy.ano }} · {{ seasonLabel }}</span>
-          <span v-else-if="liturgy?.ano">Ano {{ liturgy.ano }}</span>
-          <span v-else-if="seasonLabel">{{ seasonLabel }}</span>
+          <span v-if="dayLine">{{ dayLine }}</span>
           <span>{{ credoGlance }} · {{ intervalGlance }}</span>
         </p>
       </div>
-      <div class="accent-picker">
-        <p>Cor dos diapositivos: {{ accentChoice.name.toLowerCase() }}</p>
-        <div class="swatches">
-          <button
-            v-for="swatch in ACCENTS"
-            :key="swatch.id"
-            type="button"
-            :class="{ selected: swatch.id === accent }"
-            :style="{ background: swatch.color }"
-            :title="swatch.season ? `${swatch.name}: ${swatch.season}` : swatch.name"
-            :aria-label="swatch.season ? `${swatch.name}, ${swatch.season}` : swatch.name"
-            :aria-pressed="swatch.id === accent"
-            @click="pickAccent(swatch.id)"
-          />
-        </div>
-      </div>
     </header>
 
-    <section v-if="loading || liturgyError || liturgy?.solemnity" class="panel">
+    <section v-if="(loading && !liturgy) || liturgyError || liturgy?.solemnity" class="panel">
       <p v-if="loading" class="status">A ler a liturgia…</p>
       <p v-else-if="liturgyError" class="status error">{{ liturgyError }}</p>
       <div v-else-if="liturgy?.solemnity" class="solemnity">

@@ -174,7 +174,7 @@ public final class LiturgyClient {
         };
     }
 
-    private static LocalDate easter(int year) {
+    static LocalDate easter(int year) {
         int a = year % 19;
         int b = year / 100;
         int c = year % 100;

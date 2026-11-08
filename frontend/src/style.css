@@ -262,8 +262,170 @@ select option:checked {
   margin: 0;
 }
 
-.specimen h1 input:not([type="checkbox"]):not([type="radio"]) {
+.day-search {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+  vertical-align: top;
+}
+
+.day-search h1 {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  max-width: 100%;
+  padding: 0.05rem 0.2rem 0.05rem 0.45rem;
+  border: 1px solid transparent;
+  border-radius: 6px 6px 0 0;
+}
+
+.day-search.open h1 {
   width: 100%;
+  background: #fff;
+  border-color: var(--accent);
+  border-bottom-color: var(--line);
+}
+
+.day-search.open input:focus-visible {
+  outline: none;
+}
+
+.day-search.open .day-toggle {
+  margin-left: auto;
+}
+
+.day-toggle {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  margin-top: 0.2rem;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+}
+
+.day-toggle svg {
+  width: 1.15rem;
+  height: 1.15rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform 160ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.day-toggle[aria-expanded="true"] svg {
+  transform: rotate(180deg);
+}
+
+.day-toggle:hover {
+  background: var(--accent-soft);
+  color: var(--ink);
+}
+
+.day-matches {
+  position: absolute;
+  z-index: 6;
+  top: calc(100% - 1px);
+  left: 0;
+  width: max-content;
+  min-width: 100%;
+  max-height: 14rem;
+  overflow: auto;
+  margin: 0;
+  padding: 0.2rem 0;
+  list-style: none;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 0 0 6px 6px;
+  box-shadow: 0 8px 16px rgb(17 24 39 / 10%);
+  font-size: 0.92rem;
+  font-weight: 400;
+  letter-spacing: 0;
+  line-height: 1.3;
+}
+
+.day-hint {
+  padding: 0.55rem 0.65rem;
+  color: var(--muted);
+  cursor: default;
+}
+
+.day-matches button {
+  display: block;
+  width: 100%;
+  padding: 0.22rem 0.65rem;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  font: inherit;
+  font-weight: 400;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.day-matches button[aria-selected="true"],
+.day-matches button:hover {
+  background: var(--accent-soft);
+}
+
+.day-menu-enter-active,
+.day-menu-leave-active {
+  transform-origin: top center;
+}
+
+.day-menu-enter-active {
+  animation: day-menu-in 340ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.day-menu-leave-active {
+  animation: day-menu-in 240ms cubic-bezier(0.4, 0, 0.6, 1) reverse;
+}
+
+@keyframes day-menu-in {
+  from {
+    opacity: 0;
+    transform: scaleY(0);
+  }
+  to {
+    opacity: 1;
+    transform: scaleY(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .day-toggle svg {
+    transition: none;
+  }
+
+  .day-menu-enter-active {
+    animation: day-menu-fade 120ms ease-out;
+  }
+
+  .day-menu-leave-active {
+    animation: day-menu-fade 80ms ease-out reverse;
+  }
+}
+
+@keyframes day-menu-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.specimen h1 input:not([type="checkbox"]):not([type="radio"]) {
+  width: auto;
+  min-width: 0;
+  max-width: calc(100% - 2rem);
   margin: 0;
   padding: 0;
   border: 0;
@@ -272,6 +434,7 @@ select option:checked {
   background: transparent;
   color: var(--ink);
   font: inherit;
+  field-sizing: content;
   font-size: 1.85rem;
   font-weight: 700;
   letter-spacing: -0.03em;
@@ -305,38 +468,6 @@ select option:checked {
 .open-count {
   color: var(--muted);
   font-weight: 400;
-}
-
-.accent-picker {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 0.4rem;
-  margin-left: auto;
-}
-
-.accent-picker p {
-  margin: 0;
-  color: #5c564c;
-  font-size: 0.92rem;
-}
-
-.swatches {
-  display: flex;
-  gap: 0.45rem;
-}
-
-.swatches button {
-  appearance: none;
-  width: 1.45rem;
-  height: 1.45rem;
-  padding: 0;
-  border-radius: 4px;
-  border: 1px solid rgb(28 25 21 / 22%);
-}
-
-.swatches button.selected {
-  box-shadow: 0 0 0 2px #fff, 0 0 0 4px #1c1915;
 }
 
 header h1 {

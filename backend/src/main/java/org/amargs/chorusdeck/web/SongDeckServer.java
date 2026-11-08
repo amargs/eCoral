@@ -8,6 +8,7 @@ import org.amargs.chorusdeck.config.AppConfig;
 import org.amargs.chorusdeck.deck.DeckService;
 import org.amargs.chorusdeck.deck.Interval;
 import org.amargs.chorusdeck.deck.MassRequest;
+import org.amargs.chorusdeck.liturgy.LiturgicalCalendar;
 import org.amargs.chorusdeck.liturgy.LiturgyClient;
 import org.amargs.chorusdeck.liturgy.LiturgyDay;
 import org.amargs.chorusdeck.liturgy.SundayLibrary;
@@ -23,6 +24,7 @@ import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -99,6 +101,24 @@ public final class SongDeckServer {
             SongCatalog.Saved saved = SongCatalog.save(SongIndex.read(index), body);
             SongIndex.write(index, saved.songs());
             ctx.json(saved.song());
+        });
+        app.get("/api/celebrations", ctx -> {
+            List<LiturgicalCalendar.Celebration> days = LiturgicalCalendar.yearOf(
+                    MassDeckRequests.date(ctx.queryParam("date")));
+            List<Map<String, String>> listed = new ArrayList<>();
+            for (LiturgicalCalendar.Celebration celebration : days) {
+                Map<String, String> row = new LinkedHashMap<>();
+                row.put("date", celebration.date().toString());
+                row.put("key", celebration.key());
+                row.put("name", celebration.name());
+                row.put("ano", celebration.ano() == null ? "" : celebration.ano());
+                listed.add(row);
+            }
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("from", days.get(0).date().toString());
+            body.put("until", days.get(days.size() - 1).date().toString());
+            body.put("days", listed);
+            ctx.json(body);
         });
         app.get("/api/liturgy", ctx -> {
             Path index = library.requireIndex();
