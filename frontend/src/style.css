@@ -5,13 +5,23 @@ body,
 }
 
 :root {
-  --accent: #377d49;
-  --accent-soft: color-mix(in srgb, var(--accent) 18%, #fff);
-  --accent-ink: color-mix(in srgb, var(--accent) 62%, #1c1915);
-  color: #1c1915;
-  background: #f3f0e8;
-  font-family: "Segoe UI", sans-serif;
-  line-height: 1.4;
+  --ink: #111827;
+  --muted: #4b5563;
+  --line: #e5e7eb;
+  --paper: #f4f6f8;
+  --accent: #1d4ed8;
+  --accent-soft: #eff6ff;
+  --accent-ink: #1e3a8a;
+  color: var(--ink);
+  background: var(--paper);
+  font-family: "Atkinson Hyperlegible", "Segoe UI", sans-serif;
+  line-height: 1.45;
+  font-synthesis: none;
+}
+
+::selection {
+  background: #dbeafe;
+  color: var(--ink);
 }
 
 * {
@@ -28,14 +38,16 @@ input,
 select,
 textarea {
   font: inherit;
+  caret-color: var(--accent);
 }
 
 button {
-  border: 1px solid #c8c1b4;
+  border: 1px solid #d1d5db;
   background: #fff;
   border-radius: 6px;
   padding: 0.35rem 0.7rem;
   cursor: pointer;
+  color: var(--ink);
 }
 
 button:disabled {
@@ -65,10 +77,6 @@ button.icon.chosen {
   color: var(--accent);
   border-color: var(--accent);
   background: var(--accent-soft);
-}
-
-button.icon.chosen svg {
-  transform: scaleX(-1);
 }
 
 button.icon svg {
@@ -180,9 +188,38 @@ select option:checked {
 
 .page {
   width: 100%;
-  max-width: 1100px;
+  max-width: 1180px;
   margin: 0 auto;
-  padding: 1.5rem;
+  padding: 1.25rem 1.5rem 2rem;
+}
+
+.nav-caret .nav-icon {
+  width: 0.9rem;
+  height: 0.9rem;
+}
+
+.shape-swap {
+  margin: 0.85rem 0 0;
+}
+
+.shape-swap button {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.shape-swap button:hover {
+  color: var(--accent-ink);
+  background: transparent;
+}
+
+.deck .columns,
+.deck .cover {
+  margin-top: 1.25rem;
 }
 
 .mass-head {
@@ -191,11 +228,61 @@ select option:checked {
   justify-content: space-between;
   gap: 1rem 2rem;
   flex-wrap: wrap;
-  margin-bottom: 1.25rem;
+  margin-bottom: 1rem;
 }
 
-.mass-head .lede {
-  margin: 0.25rem 0 0;
+.specimen {
+  min-width: 0;
+  flex: 1 1 24rem;
+}
+
+.specimen h1 {
+  margin: 0;
+}
+
+.specimen h1 input:not([type="checkbox"]):not([type="radio"]) {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 1.85rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+}
+
+.catalog {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.85rem;
+  margin: 0.45rem 0 0;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.catalog label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.catalog input[type="date"] {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 0.2rem 0.4rem;
+  background: #fff;
+  color: var(--ink);
+}
+
+.open-count {
+  color: var(--muted);
+  font-weight: 400;
 }
 
 .accent-picker {
@@ -267,7 +354,7 @@ header .alter {
 }
 
 header .alter:hover {
-  background: #e7e2d6;
+  background: var(--accent-soft);
 }
 
 header .alter svg {
@@ -297,16 +384,19 @@ header .alter svg {
   flex: 1;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
-  text-align: center;
+  width: min(40rem, 100%);
+  margin: 0 auto;
+  text-align: left;
   padding: 2.5rem 1.5rem;
 }
 
 .welcome h1 {
-  margin: 0 0 0.75rem;
-  font-size: 3.25rem;
-  font-weight: 650;
+  margin: 0 0 0.85rem;
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
 }
 
 .welcome p {
@@ -333,24 +423,37 @@ header .alter svg {
   align-items: stretch;
   gap: 0.15rem;
   width: 100%;
-  height: 3.4rem;
-  padding: 0 1.15rem;
-  background: rgb(255 255 255 / 88%);
-  border-bottom: 1px solid rgb(28 25 21 / 8%);
-  backdrop-filter: blur(14px);
+  height: 3.25rem;
+  padding: 0 1.25rem;
+  background: #fff;
+  border-bottom: 1px solid var(--line);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  margin-right: 0.85rem;
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+.topbar .nav-quiet {
+  margin-left: auto;
+  color: var(--muted);
 }
 
 .topbar button {
   position: relative;
   align-self: stretch;
   margin: 0;
-  padding: 0 1rem;
+  padding: 0 0.85rem;
   border: none;
   border-radius: 0;
   background: transparent;
-  color: #6f6962;
-  font-size: 0.94rem;
-  letter-spacing: 0.01em;
+  color: var(--muted);
+  font-size: 1rem;
+  letter-spacing: 0;
 }
 
 .topbar > button,
@@ -410,7 +513,7 @@ header .alter svg {
 .nav-split.current > button {
   color: var(--accent-ink);
   background: transparent;
-  font-weight: 650;
+  font-weight: 700;
 }
 
 .topbar > button.current::after,
@@ -472,16 +575,17 @@ header .alter svg {
   padding: 0.45rem 0.7rem;
   border-radius: 6px;
   text-align: left;
-  font-weight: 500;
+  font-weight: 400;
+  white-space: nowrap;
 }
 
 .nav-menu button:hover {
-  background: #f3f0e8;
+  background: var(--paper);
 }
 
 .nav-menu button[aria-current="page"] {
   color: var(--accent-ink);
-  font-weight: 650;
+  font-weight: 700;
   background: var(--accent-soft);
 }
 
@@ -496,8 +600,9 @@ header .alter svg {
 
 .choice-row {
   display: flex;
-  gap: 1.75rem;
-  width: min(52rem, 100%);
+  flex-direction: column;
+  gap: 0.75rem;
+  width: 100%;
 }
 
 .choice-row.with-library {
@@ -508,25 +613,21 @@ header .alter svg {
   flex: 1;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
-  gap: 0.65rem;
-  min-height: 18rem;
-  padding: 1.5rem 1.4rem 1.6rem;
-  text-align: center;
-  background: #fbf6ea;
-  border-width: 2px;
-  border-color: #c4922a;
-  border-radius: 16px;
-  box-shadow: 0 8px 22px rgba(28, 25, 21, 0.06);
-  color: #1c1915;
+  gap: 0.35rem;
+  min-height: 0;
+  padding: 1rem 1.1rem;
+  text-align: left;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
 }
 
 .choice:hover {
-  background: #f8efd6;
-  border-color: #a87416;
-  transform: translateY(-2px);
-  box-shadow: 0 12px 28px rgba(28, 25, 21, 0.12);
+  background: var(--accent-soft);
+  border-color: #bfdbfe;
 }
 
 .choice:focus-visible {
@@ -664,16 +765,27 @@ header .alter svg {
   flex-direction: column;
 }
 
+.mass-columns {
+  grid-template-columns: minmax(0, 1fr) 22rem;
+}
+
 .mass-columns > .panel:first-child {
+  height: auto;
+  min-height: 0;
+  overflow: visible;
+}
+
+.song-rail {
   height: 0;
   min-height: 100%;
   overflow: hidden;
 }
 
-.mass-columns .songs {
+.mass-columns .song-rail .songs {
   flex: 1 1 auto;
   min-height: 0;
   max-height: none;
+  overflow: auto;
 }
 
 .mass-columns .moments {
@@ -812,26 +924,36 @@ header .alter svg {
 .moment {
   appearance: none;
   width: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.1rem;
-  margin: 0.25rem 0;
-  padding: 0.4rem 0.55rem;
-  /* Label plus a song line tall enough for the book badge, so picking a song does not stretch the row. */
-  min-height: calc(0.8rem + 0.1rem + 0.78rem * 1.4 + 0.85rem * 1.4 + 0.24rem + 4px);
+  display: grid;
+  grid-template-columns: 1.1rem minmax(9.5rem, 15rem) 3.4rem minmax(0, 1fr);
+  align-items: center;
+  column-gap: 0.65rem;
+  margin: 0.15rem 0;
+  padding: 0.35rem 0.45rem;
+  min-height: 2.7rem;
   text-align: left;
   border-color: transparent;
   background: transparent;
 }
 
+.mark {
+  width: 0.7rem;
+  height: 0.7rem;
+  justify-self: center;
+  border: 2px solid var(--accent);
+  border-radius: 50%;
+  background: transparent;
+  transition: background-color 160ms ease-out;
+}
+
+.mark.filled {
+  background: var(--accent);
+}
+
 .moment.armed {
-  border-radius: 0 6px 6px 0;
-  border-color: color-mix(in srgb, var(--accent) 16%, #fff);
-  border-left-width: 3px;
-  border-left-color: var(--accent);
-  padding-left: calc(0.55rem - 2px);
-  background: color-mix(in srgb, var(--accent) 8%, #fff);
+  border-radius: 6px;
+  border-color: transparent;
+  background: var(--accent-soft);
 }
 
 .moment:disabled {
@@ -840,12 +962,17 @@ header .alter svg {
 }
 
 .moment-name {
-  font-size: 0.78rem;
-  color: #6f6962;
+  font-size: 0.95rem;
+  color: var(--ink);
+}
+
+.book.wait {
+  color: var(--muted);
+  font-weight: 400;
 }
 
 .moment-name.waiting {
-  font-weight: 650;
+  font-weight: 700;
 }
 
 .moment-song.picked {
@@ -855,8 +982,11 @@ header .alter svg {
 }
 
 .moment-song {
-  color: #5c564c;
-  white-space: pre-line;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--muted);
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .estrofe-menu-anchor {
@@ -999,6 +1129,10 @@ button.icon.language-on {
   gap: 1.25rem;
 }
 
+.mass-columns {
+  grid-template-columns: minmax(0, 1fr) 22rem;
+}
+
 .panel {
   background: #fff;
   border: 1px solid #e2dcd0;
@@ -1073,7 +1207,7 @@ button.icon.language-on {
 }
 
 input:not([type="checkbox"]):not([type="radio"])::placeholder {
-  color: #a39c91;
+  color: var(--muted);
 }
 
 .songs {
@@ -1094,6 +1228,10 @@ input:not([type="checkbox"]):not([type="radio"])::placeholder {
   gap: 0.6rem;
   padding: 0.45rem 0;
   border-top: 1px solid #eeeae2;
+}
+
+.songs li.pickable {
+  cursor: pointer;
 }
 
 .catalog-song {
@@ -1376,7 +1514,7 @@ input:not([type="checkbox"]):not([type="radio"])::placeholder {
   gap: 1rem;
   margin-bottom: 1.25rem;
   padding: 0.35rem 0;
-  background: #f3f0e8;
+  background: var(--paper);
 }
 
 .verse-field {
@@ -1629,7 +1767,7 @@ button.icon.drag-handle:active {
 }
 
 .title-alt {
-  color: #8a8378;
+  color: var(--muted);
   font-size: 0.92rem;
   font-weight: 400;
   line-height: 1.25;
@@ -1659,7 +1797,7 @@ button.icon.drag-handle:active {
   margin-right: 0.45rem;
   color: var(--accent);
   font-variant-numeric: tabular-nums;
-  font-weight: 650;
+  font-weight: 700;
 }
 
 .book-badge {
@@ -1673,13 +1811,13 @@ button.icon.drag-handle:active {
   background: var(--accent-soft);
   color: var(--accent-ink);
   font-variant-numeric: tabular-nums;
-  font-weight: 650;
+  font-weight: 700;
   font-size: 0.85rem;
 }
 
 .missing {
-  color: #8a8174;
-  font-size: 0.85rem;
+  color: var(--muted);
+  font-size: 0.95rem;
 }
 
 .row-actions {
@@ -1719,9 +1857,11 @@ button.icon.row-remove:hover {
   gap: 0.3rem;
 }
 
-.reading > span {
-  color: #6f6962;
+.reading > span,
+.reading > span em {
+  color: var(--muted);
   font-size: 0.85rem;
+  font-style: normal;
 }
 
 .reading p {
@@ -1729,7 +1869,16 @@ button.icon.row-remove:hover {
 }
 
 .reading p.empty {
-  color: #8a8178;
+  color: var(--muted);
+}
+
+.path-full,
+.open-names {
+  margin: 0.65rem 0 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
 }
 
 .readings-toggle {
@@ -2098,9 +2247,9 @@ button.icon.row-remove:hover {
 .modal.readings-editor .note {
   margin: 0 0 1rem;
   padding: 0.75rem 0.85rem;
-  border: 1px solid #e4d3a8;
+  border: 1px solid #bfdbfe;
   border-radius: 8px;
-  background: #fbf6ea;
+  background: var(--accent-soft);
   color: #5c564c;
 }
 
@@ -2123,12 +2272,51 @@ button.icon.row-remove:hover {
   color: #8d2a2a;
 }
 
-@media (max-width: 800px) {
+@media (max-width: 860px) {
   .columns,
   .fields,
   .catalog-fields,
-  .choice-row {
+  .choice-row,
+  .mass-columns,
+  .export-fields {
     grid-template-columns: 1fr;
     flex-direction: column;
+  }
+
+  .topbar {
+    flex-wrap: wrap;
+    height: auto;
+    row-gap: 0;
+    padding-top: 0.35rem;
+    padding-bottom: 0.35rem;
+  }
+
+  .topbar .nav-quiet {
+    margin-left: 0;
+  }
+
+  .song-rail {
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+  }
+
+  .mass-columns .song-rail .songs {
+    flex: none;
+    max-height: 28rem;
+  }
+
+}
+
+@media (max-width: 520px) {
+  .moment {
+    grid-template-columns: 0.9rem minmax(4.5rem, 7.2rem) 2.4rem minmax(0, 1fr);
+    column-gap: 0.35rem;
+    padding-right: 0.2rem;
+  }
+
+  .moment-name,
+  .moment-song {
+    font-size: 0.82rem;
   }
 }

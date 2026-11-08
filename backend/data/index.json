@@ -1071,4 +1071,9 @@
   "title" : "Senhor te pedimos perdão",
   "content" : [ "Senhor, te pedimos perdão\nA ti que sempre nos amas\nA ti que sempre nos amas", "**Perdão, perdão**\n**Perdoa-nos Senhor**\n**Perdão, perdão**\n**Perdoa-nos Senhor**", "Senhor, te pedimos perdão\nA ti que és nosso pai\nA ti que és nosso pai", "**Perdão, perdão**\n**Perdoa-nos Senhor**\n**Perdão, perdão**\n**Perdoa-nos Senhor**" ],
   "bookId" : "RP7"
+}, {
+  "id" : 252,
+  "title" : "Aleluia Jesus vai falar",
+  "content" : [ "**Aleluia, aleluia, aleluia!**\n**Aleluia, aleluia, aleluia!**\n\nJesus vai falar, eu vou escutar e guardar no coração! (x2)" ],
+  "bookId" : "A6"
 } ]

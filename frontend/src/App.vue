@@ -5,14 +5,12 @@ import CoverFields from './components/CoverFields.vue'
 import Eucharist from './components/Eucharist.vue'
 import Library from './components/Library.vue'
 import SongList from './components/SongList.vue'
-import { THEME, deckFileName, keepEstrofes, occasionFileName, slideChoice, withShow } from './songs.js'
+import { deckFileName, keepEstrofes, occasionFileName, slideChoice, withShow } from './songs.js'
 
 const screen = ref('home')
+const shape = ref('missa')
 const lastDeck = ref('')
 const songsMounted = ref(false)
-const deckMenuHover = ref(false)
-const deckMenuPinned = ref(false)
-const presentations = ref(null)
 const eucharistMounted = ref(false)
 const libraryMounted = ref(false)
 const lectionaryMounted = ref(false)
@@ -81,6 +79,13 @@ const canGenerate = computed(() =>
 
 const chosenIds = computed(() => chosen.value.map((song) => song.id))
 
+const folderLeaf = computed(() => propsFolderLeaf(folder.value))
+
+function propsFolderLeaf(path) {
+  const parts = path.split(/[/\\]/).filter(Boolean)
+  return parts.at(-1) || ''
+}
+
 const savedName = computed(() => {
   const path = savedPath.value
   const name = path.split(/[/\\]/).pop()
@@ -89,14 +94,10 @@ const savedName = computed(() => {
 
 const draftPrompt = ref(false)
 const openingDraft = ref(false)
-const deckMenuOpen = computed(() => deckMenuHover.value || deckMenuPinned.value)
-let deckMenuClose = 0
-const presentationsCurrent = computed(() =>
-  screen.value === 'eucharist' || screen.value === 'songs' || screen.value === 'decks')
 
 const draftTitle = computed(() => {
   const name = eucharistDraft.value?.form?.domingo
-  return typeof name === 'string' && name.trim() ? name.trim() : 'Eucaristia'
+  return typeof name === 'string' && name.trim() ? name.trim() : 'Missa'
 })
 
 watch(draftPrompt, (open) => {
@@ -124,12 +125,12 @@ function dismissSaved() {
 
 function showEucharist() {
   eucharistMounted.value = true
+  songsMounted.value = true
   lastDeck.value = 'eucharist'
   screen.value = 'eucharist'
 }
 
 function openEucharist() {
-  deckMenuPinned.value = false
   if (openingDraft.value) {
     return
   }
@@ -144,69 +145,42 @@ function openEucharist() {
   showEucharist()
 }
 
-function openSongs() {
-  deckMenuPinned.value = false
-  songsMounted.value = true
-  lastDeck.value = 'songs'
-  screen.value = 'songs'
+function chooseShape(next) {
+  shape.value = next
+  if (screen.value !== 'eucharist') {
+    openEucharist()
+  }
 }
 
 function openLibrary() {
-  deckMenuPinned.value = false
   libraryMounted.value = true
   screen.value = 'library'
 }
 
 function openLectionary() {
-  deckMenuPinned.value = false
   lectionaryMounted.value = true
   screen.value = 'lectionary'
 }
 
-function openPresentations() {
-  deckMenuPinned.value = false
-  if (lastDeck.value === 'eucharist') {
-    openEucharist()
-    return
-  }
-  if (lastDeck.value === 'songs') {
-    openSongs()
-    return
-  }
-  screen.value = 'decks'
-}
-
-function goHome() {
-  deckMenuPinned.value = false
-  screen.value = 'home'
-}
-
 function openConfig() {
-  deckMenuPinned.value = false
   screen.value = 'config'
 }
 
-function toggleDeckMenu() {
-  deckMenuPinned.value = !deckMenuPinned.value
-}
-
-function showDeckMenu() {
-  window.clearTimeout(deckMenuClose)
-  deckMenuHover.value = true
-}
-
-function hideDeckMenu() {
-  window.clearTimeout(deckMenuClose)
-  deckMenuClose = window.setTimeout(() => {
-    deckMenuHover.value = false
-  }, 200)
-}
-
-function onDocumentPointer(event) {
-  if (!presentations.value?.contains(event.target)) {
-    deckMenuPinned.value = false
+watch(shape, (value) => {
+  if (value === 'lista') {
+    songsMounted.value = true
   }
-}
+})
+
+watch([libraryReady, indexPath, draftChecked], () => {
+  if (!libraryReady.value || !draftChecked.value || !indexPath.value) {
+    return
+  }
+  if (screen.value !== 'home' && screen.value !== 'decks') {
+    return
+  }
+  openEucharist()
+})
 
 function continueDraft() {
   draftPrompt.value = false
@@ -272,7 +246,6 @@ function onKeydown(event) {
   if (event.key !== 'Escape') {
     return
   }
-  deckMenuPinned.value = false
   if (savedPath.value) {
     dismissSaved()
   }
@@ -281,16 +254,12 @@ function onKeydown(event) {
 onMounted(() => {
   loadLibrary()
   loadFonts()
-  loadTheme()
   loadEucharistDraft()
   window.addEventListener('keydown', onKeydown)
-  document.addEventListener('pointerdown', onDocumentPointer)
 })
 
 onUnmounted(() => {
-  window.clearTimeout(deckMenuClose)
   window.removeEventListener('keydown', onKeydown)
-  document.removeEventListener('pointerdown', onDocumentPointer)
 })
 
 async function loadLibrary() {
@@ -338,22 +307,6 @@ async function loadFonts() {
     missingFonts.value = Array.isArray(payload.missing) ? payload.missing : []
   } catch {
     // Generating still checks the fonts when this request fails.
-  }
-}
-
-async function loadTheme() {
-  try {
-    const response = await fetch('/api/today')
-    if (!response.ok) {
-      return
-    }
-    const today = await response.json()
-    const color = THEME[today.season]
-    if (color) {
-      document.documentElement.style.setProperty('--accent', color)
-    }
-  } catch {
-    // Keep the green theme when the calendar is unreachable.
   }
 }
 
@@ -811,71 +764,15 @@ async function errorText(response) {
 
 <template>
   <div class="app">
-  <nav v-if="indexPath" class="topbar">
-    <button type="button" class="nav-link" :class="{ current: screen === 'home' }" :aria-current="screen === 'home' ? 'page' : undefined" @click="goHome">
-      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M4 11.2 12 4l8 7.2" />
-        <path stroke-linecap="round" stroke-linejoin="round" d="M7 10.2V20h10v-9.8" />
-      </svg>
-      <span class="nav-label" data-text="Início"><span>Início</span></span>
-    </button>
-    <div
-      ref="presentations"
-      class="nav-split"
-      :class="{ current: presentationsCurrent }"
-      @mouseenter="showDeckMenu"
-      @mouseleave="hideDeckMenu"
-    >
-      <button
-        type="button"
-        class="nav-link"
-        :aria-current="presentationsCurrent ? 'page' : undefined"
-        @click="openPresentations"
-      >
-        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-          <rect x="3.5" y="4" width="17" height="11.5" rx="1.5" />
-          <path stroke-linecap="round" d="M8 20h8M12 15.5V20" />
-        </svg>
-        <span class="nav-label" data-text="Apresentações"><span>Apresentações</span></span>
-      </button>
-      <button
-        type="button"
-        class="nav-caret"
-        aria-label="Eucaristia e Cânticos"
-        aria-haspopup="menu"
-        aria-controls="deck-menu"
-        :aria-expanded="deckMenuOpen"
-        @click="toggleDeckMenu"
-      >
-        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-          <path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6" />
-        </svg>
-      </button>
-      <div v-if="deckMenuOpen" id="deck-menu" class="nav-menu" role="menu">
-        <button type="button" role="menuitem" :aria-current="screen === 'eucharist' ? 'page' : undefined" @click="openEucharist">Eucaristia</button>
-        <button type="button" role="menuitem" :aria-current="screen === 'songs' ? 'page' : undefined" @click="openSongs">Cânticos</button>
-      </div>
-    </div>
-    <button type="button" class="nav-link" :class="{ current: screen === 'library' }" :aria-current="screen === 'library' ? 'page' : undefined" @click="openLibrary">
-      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-        <ellipse cx="6.5" cy="18" rx="4" ry="2.7" transform="rotate(-20 6.5 18)" />
-        <path stroke-linecap="round" d="M10 16.4V3" />
-        <path stroke-linecap="round" d="M13 5h8.2M13 9.6h6M13 14.2h8.2" />
-      </svg>
-      <span class="nav-label" data-text="Cancioneiro"><span>Cancioneiro</span></span>
-    </button>
-    <button type="button" class="nav-link" :class="{ current: screen === 'lectionary' }" :aria-current="screen === 'lectionary' ? 'page' : undefined" @click="openLectionary">
-      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-        <path stroke-linecap="round" stroke-linejoin="round" d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
-        <path stroke-linecap="round" d="M8.5 7h7M8.5 11h5" />
-      </svg>
-      <span class="nav-label" data-text="Leccionário"><span>Leccionário</span></span>
-    </button>
-    <button type="button" class="nav-cog" :class="{ current: screen === 'config' }" aria-label="Configuração" :aria-current="screen === 'config' ? 'page' : undefined" @click="openConfig">
-      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+  <nav v-if="indexPath" class="topbar" aria-label="Secções">
+    <span class="brand">eCoral</span>
+    <button type="button" class="nav-link" :class="{ current: screen === 'eucharist' }" :aria-current="screen === 'eucharist' ? 'page' : undefined" @click="openEucharist">Apresentação</button>
+    <button type="button" class="nav-link" :class="{ current: screen === 'library' }" :aria-current="screen === 'library' ? 'page' : undefined" @click="openLibrary">Cancioneiro</button>
+    <button type="button" class="nav-link" :class="{ current: screen === 'lectionary' }" :aria-current="screen === 'lectionary' ? 'page' : undefined" @click="openLectionary">Leccionário</button>
+    <button type="button" class="nav-cog" :class="{ current: screen === 'config' }" :aria-current="screen === 'config' ? 'page' : undefined" title="Configuração" aria-label="Configuração" @click="openConfig">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <circle cx="12" cy="12" r="3" />
+        <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 0 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 0 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 0 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 0 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" />
       </svg>
     </button>
   </nav>
@@ -888,10 +785,13 @@ async function errorText(response) {
     </p>
   </div>
   <div class="app-body">
-  <main v-if="libraryReady && !indexPath" class="welcome">
-    <h1>Bem-vindo! 👋</h1>
+  <main v-if="!libraryReady" class="welcome">
+    <p>A abrir…</p>
+  </main>
+  <main v-else-if="!indexPath" class="welcome">
+    <h1>Onde ficam os cânticos</h1>
     <p v-if="indexMissing">A biblioteca guardada já não está nesse sítio.</p>
-    <p>O eCoral já vem pré-configurado com um índice de cânticos e da liturgia de alguns Domingos e solenidades. Onde pretende guardar as suas alterações neste índice?</p>
+    <p>O eCoral já vem com um índice de cânticos e a liturgia de alguns Domingos e solenidades. Onde ficam as alterações?</p>
     <div class="choice-row">
       <button class="choice compact" type="button" :disabled="libraryBusy" @click="useLocalLibrary">
         <strong>Só neste computador</strong>
@@ -903,29 +803,6 @@ async function errorText(response) {
       </button>
     </div>
     <p v-if="error" class="status error">{{ error }}</p>
-  </main>
-  <main v-else-if="indexPath && (screen === 'home' || screen === 'decks')" class="welcome home-screen">
-    <h1 v-if="screen === 'home'">O que vamos preparar?</h1>
-    <div class="choice-row" :class="{ 'with-library': screen === 'home' }">
-      <button class="choice" type="button" @click="openEucharist">
-        <img src="/logo_eucaristia.png" alt="" />
-        <span class="choice-name">
-          <strong>Eucaristia</strong>
-          <span v-if="hasEucharistDraft" class="draft-chip">Rascunho guardado</span>
-        </span>
-        <span>Missa de domingo, com um cântico para cada momento.</span>
-      </button>
-      <button class="choice" type="button" @click="openSongs">
-        <img src="/logo_canticos.png" alt="" />
-        <strong>Lista de cânticos</strong>
-        <span>Uma apresentação só com cânticos, pela ordem escolhida.</span>
-      </button>
-      <button v-if="screen === 'home'" class="choice" type="button" @click="openLibrary">
-        <img src="/logo_cancioneiro.png" alt="" />
-        <strong>Cancioneiro</strong>
-        <span>Adicionar novos cânticos ou editar os existentes.</span>
-      </button>
-    </div>
   </main>
   <main v-else-if="indexPath && screen === 'config'" class="page">
     <header class="config-header">
@@ -1048,17 +925,68 @@ async function errorText(response) {
     mode="lectionary"
     :songs="library"
   />
-  <Eucharist
-    v-if="indexPath && eucharistMounted"
-    v-show="screen === 'eucharist'"
-    :songs="library"
-    :folder="folder"
-    :draft="eucharistDraft"
-    @choose-folder="chooseFolder"
-    @generated="savedPath = $event"
-    @draft="onEucharistDraft"
-    @restored="onEucharistRestored"
-  />
+  <main v-if="indexPath && (eucharistMounted || songsMounted)" v-show="screen === 'eucharist'" class="page">
+    <Eucharist
+      v-if="eucharistMounted"
+      v-show="shape === 'missa'"
+      :songs="library"
+      :folder="folder"
+      :draft="eucharistDraft"
+      @choose-folder="chooseFolder"
+      @generated="savedPath = $event"
+      @other-shape="chooseShape('lista')"
+      @draft="onEucharistDraft"
+      @restored="onEucharistRestored"
+    />
+    <div v-if="songsMounted" v-show="shape === 'lista'" class="deck">
+      <p v-if="loadError" class="status error">{{ loadError }}</p>
+      <section v-else class="panel export">
+        <div class="export-fields">
+          <label class="field">
+            <span>Ficheiro</span>
+            <input ref="outputInput" :value="output" type="text" @input="editOutput($event.target.value)" />
+          </label>
+          <div class="field">
+            <span>Pasta</span>
+            <div class="path-row">
+              <input :value="folderLeaf" :title="folder" type="text" readonly placeholder="Nenhuma pasta escolhida" />
+              <button
+                class="browse"
+                type="button"
+                title="Escolher pasta"
+                aria-label="Escolher pasta"
+                @click="chooseFolder"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <path d="M3 7.5A1.5 1.5 0 0 1 4.5 6H9l2 2h8.5A1.5 1.5 0 0 1 21 9.5v8A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5v-10z" />
+                </svg>
+              </button>
+            </div>
+          </div>
+          <button class="primary" type="button" :disabled="!canGenerate || busy" @click="generate">
+            <span v-if="busy" class="spinner" aria-hidden="true"></span>
+          {{ busy ? 'A gerar…' : 'Gerar' }}
+        </button>
+        </div>
+        <p v-if="folder" class="path-full">{{ folder }}</p>
+        <p class="shape-swap"><button type="button" @click="chooseShape('missa')">Usar a missa</button></p>
+        <p v-if="error && !savedPath" class="status error">{{ error }}</p>
+      </section>
+      <div v-if="!loadError" class="columns">
+        <SongList
+          heading="Procurar"
+          :songs="library"
+          :query="query"
+          :chosen-ids="chosenIds"
+          @update:query="query = $event"
+          @add="add"
+          @remove-song="removeSong"
+        />
+        <ChosenSongs :songs="chosen" @remove="remove" @up="move($event, -1)" @down="move($event, 1)" @clear="clearChosen" @show="showSong" />
+      </div>
+      <CoverFields v-if="!loadError" v-model:enabled="coverOn" :cover="cover" />
+    </div>
+  </main>
   <div v-if="draftPrompt" class="modal-backdrop">
     <div class="modal confirm" role="dialog" aria-modal="true" aria-labelledby="draft-prompt">
       <p id="draft-prompt">Há um rascunho de {{ draftTitle }} por continuar. Quer retomá-lo?</p>
@@ -1068,55 +996,6 @@ async function errorText(response) {
       </div>
     </div>
   </div>
-  <main v-if="indexPath && songsMounted" v-show="screen === 'songs'" class="page">
-    <header>
-      <h1>Cânticos</h1>
-      <p class="lede">Criar apresentação com um conjunto de cânticos.</p>
-    </header>
-    <p v-if="indexPath && loadError" class="status error">{{ loadError }}</p>
-    <div v-else-if="indexPath" class="columns">
-      <SongList
-        :songs="library"
-        :query="query"
-        :chosen-ids="chosenIds"
-        @update:query="query = $event"
-        @add="add"
-        @remove-song="removeSong"
-      />
-      <ChosenSongs :songs="chosen" @remove="remove" @up="move($event, -1)" @down="move($event, 1)" @clear="clearChosen" @show="showSong" />
-    </div>
-    <CoverFields v-if="indexPath" v-model:enabled="coverOn" :cover="cover" />
-    <section v-if="indexPath" class="panel export">
-      <h2>Exportar</h2>
-      <div class="export-fields">
-        <label class="field">
-          <span>Ficheiro</span>
-          <input ref="outputInput" :value="output" type="text" @input="editOutput($event.target.value)" />
-        </label>
-        <div class="field">
-          <span>Pasta</span>
-          <div class="path-row">
-            <input :value="folder" type="text" readonly placeholder="Nenhuma pasta escolhida" />
-            <button
-              class="browse"
-              type="button"
-              title="Escolher pasta"
-              aria-label="Escolher pasta"
-              @click="chooseFolder"
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                <path d="M3 7.5A1.5 1.5 0 0 1 4.5 6H9l2 2h8.5A1.5 1.5 0 0 1 21 9.5v8A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5v-10z" />
-              </svg>
-            </button>
-          </div>
-        </div>
-        <button class="primary" type="button" :disabled="!canGenerate || busy" @click="generate">
-          <span v-if="busy" class="spinner" aria-hidden="true"></span>
-          {{ busy ? 'A gerar…' : 'Gerar' }}
-        </button>
-      </div>
-      <p v-if="error && !savedPath" class="status error">{{ error }}</p>
-    </section>
     <div v-if="fileOpen" class="modal-backdrop" @click.self="fileOpen = ''">
       <div class="modal confirm" role="dialog" aria-modal="true" aria-labelledby="file-open" @keydown.esc="fileOpen = ''">
         <p id="file-open" class="file-open">{{ fileOpen }}</p>
@@ -1134,7 +1013,6 @@ async function errorText(response) {
         </div>
       </div>
     </div>
-  </main>
     <div v-if="savedPath" class="modal-backdrop" @click.self="dismissSaved">
       <div class="modal" role="dialog" aria-modal="true" aria-labelledby="export-done">
         <button class="icon close" type="button" aria-label="Fechar" @click="dismissSaved">

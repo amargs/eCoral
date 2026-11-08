@@ -311,16 +311,16 @@
       "season" : "comum",
       "primeira" : {
         "referencia" : "Pr 31, 10-13, 19-20, 30-31",
-        "citacao" : ""
+        "citacao" : "Põe mãos ao trabalho alegremente"
       },
       "segunda" : {
         "referencia" : "1Ts 5, 1-6",
-        "citacao" : ""
+        "citacao" : "Para que o dia do Senhor não vos surpreenda como um ladrão"
       },
-      "salmo" : "",
+      "salmo" : "Ditosos os que temem o Senhor, ditosos os que seguem os seus caminhos!",
       "evangelho" : {
         "referencia" : "Mt 25, 14-30",
-        "citacao" : ""
+        "citacao" : "Foste fiel em coisas pequenas: vem tomar parte na alegria do teu Senhor"
       }
     },
     "holy-family/B" : {
@@ -396,16 +396,16 @@
       "season" : "comum",
       "primeira" : {
         "referencia" : "Sb 6, 12-16",
-        "citacao" : ""
+        "citacao" : "A Sabedoria faz-se encontrar aos que a procuram"
       },
       "segunda" : {
-        "referencia" : "1Ts 4, 13-18",
-        "citacao" : ""
+        "referencia" : "1 Tes 4, 13-18",
+        "citacao" : "Deus levará com Jesus os que em Jesus tiverem morrido"
       },
-      "salmo" : "",
+      "salmo" : "A minha alma tem sede de Vós, meu Deus.",
       "evangelho" : {
         "referencia" : "Mt 25, 1-13",
-        "citacao" : ""
+        "citacao" : "Aí vem o Esposo: ide ao seu encontro"
       }
     },
     "ordinary-20/A" : {
@@ -476,6 +476,23 @@
       "segunda" : {
         "referencia" : "1 Jo 3, 1-3",
         "citacao" : "Veremos a Deus tal como Ele é"
+      }
+    },
+    "ordinary-33/C" : {
+      "domingo" : "Domingo XXXIII",
+      "season" : "comum",
+      "primeira" : {
+        "referencia" : "",
+        "citacao" : ""
+      },
+      "salmo" : "",
+      "evangelho" : {
+        "referencia" : "",
+        "citacao" : ""
+      },
+      "segunda" : {
+        "referencia" : "",
+        "citacao" : ""
       }
     }
   }

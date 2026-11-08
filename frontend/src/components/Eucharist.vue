@@ -11,7 +11,7 @@ const props = defineProps({
   draft: { type: Object, default: null },
 })
 
-const emit = defineEmits(['choose-folder', 'generated', 'draft', 'restored'])
+const emit = defineEmits(['choose-folder', 'generated', 'draft', 'restored', 'other-shape'])
 
 const SONG_MOMENTS = new Set(MOMENTS.map((moment) => moment.id))
 const INTERVALS = new Set(['vazio', 'imagem', 'texto', 'texto+imagem'])
@@ -125,6 +125,51 @@ const liturgyUrl = computed(() => {
     return ''
   }
   return `https://www.liturgia.pt/liturgiadiaria/dia.php?data=${year}-${Number(month)}-${Number(day)}`
+})
+
+const openCount = computed(() =>
+  moments.value.filter((moment) => !moment.optional && !slots[moment.id]).length)
+
+const openMoments = computed(() =>
+  rows.value.filter((moment) => !moment.fixed && !moment.optional && !slots[moment.id]))
+
+const armedMoment = computed(() => rows.value.find((moment) => moment.id === active.value))
+
+const railHeading = computed(() =>
+  armedMoment.value ? armedMoment.value.label : 'Procurar')
+
+const assignLabel = computed(() =>
+  armedMoment.value ? `Pôr em ${armedMoment.value.label}` : 'Adicionar')
+
+const openLabel = computed(() => {
+  if (!liturgy.value) {
+    return ''
+  }
+  const count = openCount.value
+  if (count === 0) {
+    return 'todos escolhidos'
+  }
+  return `${count} por escolher`
+})
+
+const folderLeaf = computed(() => {
+  const parts = props.folder.split(/[/\\]/).filter(Boolean)
+  return parts.at(-1) || ''
+})
+
+const credoGlance = computed(() => (credo.value === 'breve' ? 'Credo breve' : 'Credo longo'))
+
+const intervalGlance = computed(() => {
+  if (interval.value === 'imagem') {
+    return 'intervalo com imagem'
+  }
+  if (interval.value === 'texto') {
+    return 'intervalo com texto'
+  }
+  if (interval.value === 'texto+imagem') {
+    return 'intervalo com texto e imagem'
+  }
+  return 'intervalo em branco'
 })
 
 const canGenerate = computed(() =>
@@ -304,7 +349,6 @@ function showAccent(id) {
     return
   }
   accent.value = swatch.id
-  document.documentElement.style.setProperty('--accent', swatch.color)
 }
 
 function pickAccent(id) {
@@ -758,14 +802,31 @@ async function generate(force = false, replace = false) {
 </script>
 
 <template>
-  <main class="page">
+  <div class="deck">
     <header class="mass-head">
-      <div>
-        <h1>Eucaristia</h1>
-        <p class="lede">Preparar os cânticos e liturgia de uma eucaristia.</p>
+      <div class="specimen">
+        <h1>
+          <input
+            v-model="form.domingo"
+            type="text"
+            :disabled="!liturgy"
+            :aria-label="useSolemnity ? 'Título' : 'Domingo'"
+            :placeholder="loading ? 'A ler a liturgia…' : 'Domingo'"
+          />
+        </h1>
+        <p class="catalog">
+          <label>
+            Data
+            <input v-model.lazy="date" type="date" />
+          </label>
+          <span v-if="liturgy?.ano && seasonLabel">Ano {{ liturgy.ano }} · {{ seasonLabel }}</span>
+          <span v-else-if="liturgy?.ano">Ano {{ liturgy.ano }}</span>
+          <span v-else-if="seasonLabel">{{ seasonLabel }}</span>
+          <span>{{ credoGlance }} · {{ intervalGlance }}</span>
+        </p>
       </div>
       <div class="accent-picker">
-        <p>Cor de destaque: {{ accentChoice.name.toLowerCase() }}<template v-if="accentChoice.season"> ({{ accentChoice.id === 'accent4' ? accentChoice.season : accentChoice.season.toLowerCase() }})</template></p>
+        <p>Cor dos diapositivos: {{ accentChoice.name.toLowerCase() }}</p>
         <div class="swatches">
           <button
             v-for="swatch in ACCENTS"
@@ -782,25 +843,7 @@ async function generate(force = false, replace = false) {
       </div>
     </header>
 
-    <section class="panel">
-      <div class="occasion">
-        <label class="field domingo">
-          <span>Data</span>
-          <input v-model.lazy="date" type="date" />
-        </label>
-        <label class="field">
-          <span>{{ useSolemnity ? 'Título' : 'Domingo' }}</span>
-          <input v-model="form.domingo" type="text" :disabled="!liturgy" />
-        </label>
-        <label class="field tempo">
-          <span>Tempo</span>
-          <input :value="seasonLabel" type="text" readonly />
-        </label>
-        <label class="field ano">
-          <span>Ano</span>
-          <input :value="liturgy?.ano || ''" type="text" readonly />
-        </label>
-      </div>
+    <section v-if="loading || liturgyError || liturgy?.solemnity" class="panel">
       <p v-if="loading" class="status">A ler a liturgia…</p>
       <p v-else-if="liturgyError" class="status error">{{ liturgyError }}</p>
       <div v-else-if="liturgy?.solemnity" class="solemnity">
@@ -812,19 +855,37 @@ async function generate(force = false, replace = false) {
       </div>
     </section>
 
+    <section class="panel export">
+      <div class="export-fields">
+        <label class="field">
+          <span>Ficheiro</span>
+          <input ref="outputInput" :value="output" type="text" @input="outputEdited = true; output = $event.target.value" />
+        </label>
+        <div class="field">
+          <span>Pasta</span>
+          <div class="path-row">
+            <input :value="folderLeaf" :title="folder" type="text" readonly placeholder="Nenhuma pasta escolhida" />
+            <button class="browse" type="button" title="Escolher pasta" aria-label="Escolher pasta" @click="emit('choose-folder')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <path d="M3 7.5A1.5 1.5 0 0 1 4.5 6H9l2 2h8.5A1.5 1.5 0 0 1 21 9.5v8A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5v-10z" />
+              </svg>
+            </button>
+          </div>
+        </div>
+        <button class="primary" type="button" :disabled="!canGenerate || busy" @click="generate">
+          <span v-if="busy" class="spinner" aria-hidden="true"></span>
+          {{ busy ? 'A gerar…' : 'Gerar' }}
+        </button>
+      </div>
+      <p v-if="folder" class="path-full">{{ folder }}</p>
+      <p v-if="openMoments.length" class="open-names">Ainda por preencher: {{ openMoments.map((moment) => moment.label).join(', ') }}.</p>
+      <p class="shape-swap"><button type="button" @click="emit('other-shape')">Usar lista de cânticos</button></p>
+      <p v-if="error" class="status error">{{ error }}</p>
+    </section>
+
     <div class="columns mass-columns">
-      <SongList
-        heading="Cânticos"
-        require-book-id
-        :songs="songs"
-        :query="query"
-        :chosen-ids="placedIds"
-        @update:query="query = $event"
-        @add="pick"
-        @remove-song="unpick"
-      />
       <section class="panel">
-        <h2>Momentos</h2>
+        <h2>Momentos<span v-if="openLabel" class="open-count"> · {{ openLabel }}</span></h2>
         <ul class="moments">
           <li v-for="moment in rows" :key="moment.id">
             <div class="moment-pick">
@@ -835,19 +896,19 @@ async function generate(force = false, replace = false) {
                 :disabled="moment.fixed"
                 @click="chooseMoment(moment.id)"
               >
-                <span class="moment-name" :class="{ waiting: !moment.fixed && !moment.optional && !slots[moment.id] }">{{ moment.label }}<template v-if="languageLabel(slots[moment.id])"> · {{ languageLabel(slots[moment.id]) }}</template><template v-if="estrofeCountLabel(slots[moment.id])"> · {{ estrofeCountLabel(slots[moment.id]) }}</template></span>
+                <span class="mark" :class="{ filled: moment.fixed || moment.optional || !!slots[moment.id] }" aria-hidden="true"></span>
+                <span class="moment-name" :class="{ waiting: !moment.fixed && !moment.optional && !slots[moment.id] }">{{ moment.label }}<template v-if="active === moment.id && languageLabel(slots[moment.id])"> · {{ languageLabel(slots[moment.id]) }}</template><template v-if="active === moment.id && estrofeCountLabel(slots[moment.id])"> · {{ estrofeCountLabel(slots[moment.id]) }}</template></span>
+                <span v-if="slots[moment.id]" class="book">{{ slots[moment.id].bookId || '#' }}</span>
+                <span v-else class="book wait">—</span>
                 <span v-if="moment.fixed" class="moment-song">{{ form.louvor || 'O refrão fica no diapositivo' }}</span>
-                <span v-else-if="slots[moment.id]" class="moment-song picked">
-                  <span class="book-badge">{{ slots[moment.id].bookId || '#' }}</span>
-                  {{ slots[moment.id].title }}
-                </span>
-                <span v-else-if="moment.optional" class="missing">Rezado</span>
-                <span v-else class="missing">por escolher</span>
+                <span v-else-if="slots[moment.id]" class="moment-song picked">{{ slots[moment.id].title }}</span>
+                <span v-else-if="moment.optional" class="moment-song">Rezado</span>
+                <span v-else class="moment-song missing">Por escolher</span>
               </button>
             </div>
-            <SongShow v-if="slots[moment.id]" :song="slots[moment.id]" @change="setShow(moment.id, $event)" />
+            <SongShow v-if="!moment.fixed && active === moment.id && slots[moment.id]" :song="slots[moment.id]" @change="setShow(moment.id, $event)" />
             <Estrofes
-              v-if="slots[moment.id]"
+              v-if="!moment.fixed && active === moment.id && slots[moment.id]"
               compact
               :song="slots[moment.id]"
               :open="estrofesOpen === moment.id"
@@ -870,6 +931,18 @@ async function generate(force = false, replace = false) {
           </li>
         </ul>
       </section>
+      <SongList
+        class="song-rail"
+        :heading="railHeading"
+        :action-label="assignLabel"
+        require-book-id
+        :songs="songs"
+        :query="query"
+        :chosen-ids="placedIds"
+        @update:query="query = $event"
+        @add="pick"
+        @remove-song="unpick"
+      />
     </div>
 
     <section v-if="liturgy" class="panel cover">
@@ -920,7 +993,7 @@ async function generate(force = false, replace = false) {
         </div>
         <div class="reading">
           <span>Salmo</span>
-          <input v-model="form.salmo" type="text" aria-label="Salmo" />
+          <p :class="{ empty: !form.salmo.trim() }">{{ shown(form.salmo) }}</p>
         </div>
         <div v-if="liturgy.segunda" class="reading">
           <span>Segunda leitura <em v-if="form.segundaRef">{{ form.segundaRef }}</em></span>
@@ -976,32 +1049,6 @@ async function generate(force = false, replace = false) {
           </div>
         </div>
       </div>
-    </section>
-
-    <section class="panel export">
-      <h2>Exportar</h2>
-      <div class="export-fields">
-        <label class="field">
-          <span>Ficheiro</span>
-          <input ref="outputInput" :value="output" type="text" @input="outputEdited = true; output = $event.target.value" />
-        </label>
-        <div class="field">
-          <span>Pasta</span>
-          <div class="path-row">
-            <input :value="folder" type="text" readonly placeholder="Nenhuma pasta escolhida" />
-            <button class="browse" type="button" title="Escolher pasta" aria-label="Escolher pasta" @click="emit('choose-folder')">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                <path d="M3 7.5A1.5 1.5 0 0 1 4.5 6H9l2 2h8.5A1.5 1.5 0 0 1 21 9.5v8A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5v-10z" />
-              </svg>
-            </button>
-          </div>
-        </div>
-        <button class="primary" type="button" :disabled="!canGenerate || busy" @click="generate">
-          <span v-if="busy" class="spinner" aria-hidden="true"></span>
-          {{ busy ? 'A gerar…' : 'Gerar' }}
-        </button>
-      </div>
-      <p v-if="error" class="status error">{{ error }}</p>
     </section>
 
     <div v-if="readingsOpen" class="modal-backdrop" @click.self="readingsOpen = false">
@@ -1084,5 +1131,5 @@ async function generate(force = false, replace = false) {
         </div>
       </div>
     </div>
-  </main>
+  </div>
 </template>

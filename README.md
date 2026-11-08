@@ -2,7 +2,7 @@
 
 eCoral prepares the PowerPoint for Mass. It writes a cover, the readings, the prayers that stay the same, and the songs.
 
-The bar is **Início**, **Apresentações**, **Cancioneiro**, **Leccionário**, and **Configuração**. Apresentações opens **Eucaristia** or **Cânticos**.
+The bar is **eCoral**, **Apresentação**, **Cancioneiro**, **Leccionário**, and a cog for **Configuração**. Apresentação opens on **Missa**. The file row offers **Usar lista de cânticos**; that page offers **Usar a missa**.
 
 - **Eucaristia** builds a Sunday Mass. The date fills the name, the season, the year, and the reading sentences, and a Sunday it has not seen before is fetched and remembered. Each moment of the Mass can take a song. Glória and Pai Nosso can stay spoken (**Rezado**). Advent and Lent leave out the Glória, and in Lent the Alleluia is the Louvor verse. You can choose the Creed, a response for the prayer of the faithful, the pause between slides, and the highlight color. A Sunday that is also a fixed solemnity can stay the Sunday or use that solemnity. The cover and the reading sentences can be edited for this presentation. An unfinished Mass is kept on this computer, and the next visit asks whether to continue it.
 - **Cânticos** is a deck of songs in the order you choose, with an optional cover. The file name starts as `cânticos.pptx`.

@@ -7,6 +7,7 @@ const props = defineProps({
   query: { type: String, required: true },
   chosenIds: { type: Array, required: true },
   heading: { type: String, default: 'Lista de cânticos' },
+  actionLabel: { type: String, default: 'Adicionar' },
   requireBookId: { type: Boolean, default: false },
 })
 
@@ -46,7 +47,7 @@ const visible = computed(() =>
       @input="emit('update:query', $event.target.value)"
     />
     <ul class="songs">
-      <li v-for="song in visible" :key="song.id">
+      <li v-for="song in visible" :key="song.id" :class="{ pickable: !unavailable(song) }" @click="toggle(song)">
         <span class="song-label">
           <span class="book-badge">{{ song.bookId || '#' }}</span>
           <span class="song-name">
@@ -59,12 +60,14 @@ const visible = computed(() =>
           type="button"
           class="icon"
           :class="{ chosen: picked(song) }"
-          :aria-label="picked(song) ? 'Retirar' : 'Adicionar'"
+          :aria-label="picked(song) ? 'Retirar' : actionLabel"
+          :title="picked(song) ? 'Retirar' : actionLabel"
           :disabled="unavailable(song)"
-          @click="toggle(song)"
+          @click.stop="toggle(song)"
         >
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M5 12h14M13 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path v-if="picked(song)" d="M6 6l12 12M18 6 6 18" />
+            <path v-else stroke-linecap="round" d="M12 5v14M5 12h14" />
           </svg>
         </button>
       </li>
