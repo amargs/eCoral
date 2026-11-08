@@ -135,8 +135,15 @@ const openMoments = computed(() =>
 
 const armedMoment = computed(() => rows.value.find((moment) => moment.id === active.value))
 
-const railHeading = computed(() =>
-  armedMoment.value ? armedMoment.value.label : 'Procurar')
+const railHeading = computed(() => {
+  if (!armedMoment.value) {
+    return 'Procurar'
+  }
+  if (armedMoment.value.id === 'aleluia') {
+    return 'aleluia'
+  }
+  return `Escolher ${armedMoment.value.label}`
+})
 
 const assignLabel = computed(() =>
   armedMoment.value ? `Pôr em ${armedMoment.value.label}` : 'Adicionar')
@@ -898,12 +905,20 @@ async function generate(force = false, replace = false) {
               >
                 <span class="mark" :class="{ filled: moment.fixed || moment.optional || !!slots[moment.id] }" aria-hidden="true"></span>
                 <span class="moment-name" :class="{ waiting: !moment.fixed && !moment.optional && !slots[moment.id] }">{{ moment.label }}<template v-if="active === moment.id && languageLabel(slots[moment.id])"> · {{ languageLabel(slots[moment.id]) }}</template><template v-if="active === moment.id && estrofeCountLabel(slots[moment.id])"> · {{ estrofeCountLabel(slots[moment.id]) }}</template></span>
-                <span v-if="slots[moment.id]" class="book">{{ slots[moment.id].bookId || '#' }}</span>
-                <span v-else class="book wait">—</span>
-                <span v-if="moment.fixed" class="moment-song">{{ form.louvor || 'O refrão fica no diapositivo' }}</span>
-                <span v-else-if="slots[moment.id]" class="moment-song picked">{{ slots[moment.id].title }}</span>
-                <span v-else-if="moment.optional" class="moment-song">Rezado</span>
-                <span v-else class="moment-song missing">Por escolher</span>
+                <span class="moment-book">
+                  <Transition name="moment-swap">
+                    <span v-if="slots[moment.id]" :key="slots[moment.id].id" class="book book-badge">{{ slots[moment.id].bookId || '#' }}</span>
+                    <span v-else key="empty" class="book wait">—</span>
+                  </Transition>
+                </span>
+                <span class="moment-song-slot">
+                  <Transition name="moment-swap">
+                    <span v-if="moment.fixed" key="fixed" class="moment-song">{{ form.louvor || 'O refrão fica no diapositivo' }}</span>
+                    <span v-else-if="slots[moment.id]" :key="slots[moment.id].id" class="moment-song picked">{{ slots[moment.id].title }}</span>
+                    <span v-else-if="moment.optional" key="rezado" class="moment-song">Rezado</span>
+                    <span v-else key="empty" class="moment-song missing">Por escolher</span>
+                  </Transition>
+                </span>
               </button>
             </div>
             <SongShow v-if="!moment.fixed && active === moment.id && slots[moment.id]" :song="slots[moment.id]" @change="setShow(moment.id, $event)" />

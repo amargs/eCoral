@@ -39,10 +39,10 @@ export function deckFileName(domingo, season, ano) {
 }
 
 export const MOMENTS = [
-  { id: 'entrada', label: 'Cântico de entrada' },
+  { id: 'entrada', label: 'Entrada' },
   { id: 'kyrie', label: 'Kyrie' },
   { id: 'gloria', label: 'Glória' },
-  { id: 'aleluia', label: 'Aleluia' },
+  { id: 'aleluia', label: 'Aclamação' },
   { id: 'dons', label: 'Apresentação dos dons' },
   { id: 'santo', label: 'Santo' },
   { id: 'paiNosso', label: 'Pai Nosso' },

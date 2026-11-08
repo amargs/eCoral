@@ -47,7 +47,7 @@ const visible = computed(() =>
       @input="emit('update:query', $event.target.value)"
     />
     <ul class="songs">
-      <li v-for="song in visible" :key="song.id" :class="{ pickable: !unavailable(song) }" @click="toggle(song)">
+      <li v-for="song in visible" :key="song.id" :class="{ pickable: !unavailable(song), placed: picked(song) }" @click="toggle(song)">
         <span class="song-label">
           <span class="book-badge">{{ song.bookId || '#' }}</span>
           <span class="song-name">
@@ -58,16 +58,15 @@ const visible = computed(() =>
         <span v-if="!song.hasVerses" class="missing">sem letra</span>
         <button
           type="button"
-          class="icon"
+          class="icon song-toggle"
           :class="{ chosen: picked(song) }"
           :aria-label="picked(song) ? 'Retirar' : actionLabel"
           :title="picked(song) ? 'Retirar' : actionLabel"
           :disabled="unavailable(song)"
           @click.stop="toggle(song)"
         >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-            <path v-if="picked(song)" d="M6 6l12 12M18 6 6 18" />
-            <path v-else stroke-linecap="round" d="M12 5v14M5 12h14" />
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+            <path d="M12 5v14M5 12h14" />
           </svg>
         </button>
       </li>
