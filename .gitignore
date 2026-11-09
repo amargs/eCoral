@@ -49,3 +49,8 @@ frontend/dist/
 
 # Leftover UI output from before the build wrote to frontend/dist.
 backend/src/main/resources/ui/
+
+# Local planning notes; kept on disk, not in the repository.
+/PLAN.md
+/DESIGN.md
+/PRODUCT.md
