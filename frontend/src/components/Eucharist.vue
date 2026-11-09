@@ -119,11 +119,13 @@ const accentChoice = computed(() => ACCENTS.find((item) => item.id === accent.va
 
 const celebrations = ref([])
 const celebrationSpan = ref({ from: '', until: '' })
+const daySearch = ref(null)
 const dayOpen = ref(false)
 const dayFiltering = ref(false)
 const dayCursor = ref(0)
-const dayMenuWidth = ref(0)
+const daySpanning = ref(false)
 let daySnapshot = ''
+let daySpanTicket = 0
 
 const dayLine = computed(() => {
   const parts = []
@@ -447,6 +449,7 @@ async function loadCelebrations(forDate) {
     celebrationSpan.value = { from: payload.from || '', until: payload.until || '' }
     if (dayOpen.value && !dayFiltering.value) {
       placeDayCursor(currentDayIndex())
+      sizeDayMenu()
     }
   } catch {
     // The date still fills the day when the list cannot be read.
@@ -461,18 +464,108 @@ function placeDayCursor(index) {
   })
 }
 
+function menuOuterWidth(menu) {
+  const buttons = [...menu.querySelectorAll('button')]
+  const previous = menu.style.width
+  const widths = buttons.map((button) => button.style.width)
+  menu.style.width = 'max-content'
+  buttons.forEach((button) => {
+    button.style.width = 'max-content'
+  })
+  const width = Math.ceil(menu.offsetWidth)
+  menu.style.width = previous
+  buttons.forEach((button, index) => {
+    button.style.width = widths[index]
+  })
+  return width
+}
+
+function glideDaySpan(root, to) {
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  const ticket = ++daySpanTicket
+  if (reduced) {
+    root.style.transition = ''
+    root.style.width = to
+    return ticket
+  }
+  const from = root.getBoundingClientRect().width
+  root.style.transition = 'none'
+  root.style.width = `${from}px`
+  void root.offsetWidth
+  root.style.transition = ''
+  root.style.width = to
+  return ticket
+}
+
 function sizeDayMenu() {
+  if (!dayOpen.value || dayFiltering.value) {
+    return
+  }
+  daySpanning.value = true
   nextTick(() => {
-    if (!dayOpen.value || dayFiltering.value) {
-      return
-    }
+    const root = daySearch.value
     const menu = document.getElementById('day-matches')
-    if (!menu) {
+    if (!root || !menu || !dayOpen.value || dayFiltering.value) {
       return
     }
-    dayMenuWidth.value = menu.offsetWidth
+    const current = Math.ceil(root.getBoundingClientRect().width)
+    glideDaySpan(root, `${Math.max(menuOuterWidth(menu), current)}px`)
   })
 }
+
+function releaseDaySpan() {
+  const root = daySearch.value
+  if (!root || !daySpanning.value) {
+    return
+  }
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  if (reduced) {
+    daySpanning.value = false
+    root.style.width = ''
+    return
+  }
+  const from = root.getBoundingClientRect().width
+  root.style.transition = 'none'
+  root.style.width = 'max-content'
+  const to = root.offsetWidth
+  root.style.width = `${from}px`
+  void root.offsetWidth
+  if (Math.abs(from - to) < 1) {
+    daySpanning.value = false
+    root.style.transition = ''
+    root.style.width = ''
+    return
+  }
+  root.style.transition = ''
+  const ticket = ++daySpanTicket
+  root.style.width = `${to}px`
+  const finish = (event) => {
+    if (event.propertyName !== 'width') {
+      return
+    }
+    root.removeEventListener('transitionend', finish)
+    if (ticket !== daySpanTicket) {
+      return
+    }
+    daySpanning.value = false
+    root.style.width = ''
+  }
+  root.addEventListener('transitionend', finish)
+  window.setTimeout(() => {
+    if (ticket !== daySpanTicket || dayOpen.value) {
+      return
+    }
+    root.removeEventListener('transitionend', finish)
+    daySpanning.value = false
+    root.style.width = ''
+  }, 320)
+}
+
+watch(dayOpen, (open) => {
+  if (!open) {
+    nextTick(releaseDaySpan)
+  }
+})
 
 function onDayFocus(event) {
   daySnapshot = form.domingo
@@ -514,7 +607,7 @@ function onDayToggle() {
 
 function onDayBlur() {
   window.setTimeout(() => {
-    const root = document.querySelector('.day-search')
+    const root = daySearch.value
     if (!root?.contains(document.activeElement)) {
       dayOpen.value = false
     }
@@ -532,14 +625,16 @@ function pickDay(item) {
 
 function onDayKey(event) {
   const matches = dayMatches.value
-  if (event.key === 'ArrowDown') {
+  if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
     event.preventDefault()
+    const opening = !dayOpen.value
     dayOpen.value = true
-    dayCursor.value = Math.min(dayCursor.value + 1, Math.max(matches.length - 1, 0))
-  } else if (event.key === 'ArrowUp') {
-    event.preventDefault()
-    dayOpen.value = true
-    dayCursor.value = Math.max(dayCursor.value - 1, 0)
+    if (opening) {
+      sizeDayMenu()
+    }
+    dayCursor.value = event.key === 'ArrowDown'
+      ? Math.min(dayCursor.value + 1, Math.max(matches.length - 1, 0))
+      : Math.max(dayCursor.value - 1, 0)
   } else if (event.key === 'Enter' && dayOpen.value && matches[dayCursor.value]) {
     event.preventDefault()
     pickDay(matches[dayCursor.value])
@@ -999,7 +1094,7 @@ async function generate(force = false, replace = false) {
   <div class="deck">
     <header class="mass-head">
       <div class="specimen">
-        <div class="day-search" :class="{ open: dayOpen }" :style="dayOpen && dayMenuWidth ? { minWidth: dayMenuWidth + 'px' } : undefined">
+        <div ref="daySearch" class="day-search" :class="{ open: dayOpen, spanning: daySpanning }">
           <h1>
             <input
               id="day-field"

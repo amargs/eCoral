@@ -263,10 +263,18 @@ select option:checked {
 }
 
 .day-search {
+  --day-inset: 0.45rem;
   position: relative;
   display: inline-block;
-  max-width: 100%;
+  max-width: calc(100% + var(--day-inset) + 1px);
+  margin-inline-start: calc(-1 * (var(--day-inset) + 1px));
   vertical-align: top;
+  transition: width 240ms cubic-bezier(0.4, 0, 0.6, 1);
+}
+
+.day-search.open {
+  transition-duration: 340ms;
+  transition-timing-function: cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 
 .day-search h1 {
@@ -274,23 +282,26 @@ select option:checked {
   align-items: center;
   gap: 0.55rem;
   max-width: 100%;
-  padding: 0.05rem 0.2rem 0.05rem 0.45rem;
+  padding: 0.05rem 0.2rem 0.05rem var(--day-inset);
   border: 1px solid transparent;
   border-radius: 6px 6px 0 0;
 }
 
 .day-search.open h1 {
-  width: 100%;
   background: #fff;
   border-color: var(--accent);
   border-bottom-color: var(--line);
+}
+
+.day-search.spanning h1 {
+  width: 100%;
 }
 
 .day-search.open input:focus-visible {
   outline: none;
 }
 
-.day-search.open .day-toggle {
+.day-search.spanning .day-toggle {
   margin-left: auto;
 }
 
@@ -337,7 +348,8 @@ select option:checked {
   width: max-content;
   min-width: 100%;
   max-height: 14rem;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
   margin: 0;
   padding: 0.2rem 0;
   list-style: none;
@@ -352,15 +364,19 @@ select option:checked {
 }
 
 .day-hint {
-  padding: 0.55rem 0.65rem;
+  padding: 0.55rem 0.65rem 0.55rem var(--day-inset);
   color: var(--muted);
   cursor: default;
+}
+
+.day-search.spanning .day-matches {
+  width: 100%;
 }
 
 .day-matches button {
   display: block;
   width: 100%;
-  padding: 0.22rem 0.65rem;
+  padding: 0.22rem 0.65rem 0.22rem var(--day-inset);
   border: 0;
   border-radius: 0;
   background: transparent;
@@ -400,6 +416,7 @@ select option:checked {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .day-search,
   .day-toggle svg {
     transition: none;
   }
