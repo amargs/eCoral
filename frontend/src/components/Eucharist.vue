@@ -33,9 +33,8 @@ const form = reactive({
   louvor: '',
 })
 const useSolemnity = ref(false)
-const readingsOpen = ref(false)
-const readingsDialog = ref(null)
 const cover = ref('')
+const deckChoices = ref(null)
 const accent = ref('accent1')
 const accentTouched = ref(false)
 const slots = reactive({})
@@ -86,19 +85,26 @@ const moments = computed(() => rows.value.filter((moment) => !moment.fixed))
 const placedIds = computed(() =>
   Object.values(slots).filter(Boolean).map((song) => song.id))
 
-const intervalReady = computed(() => {
-  if (interval.value === 'imagem' || interval.value === 'texto+imagem') {
-    if (!intervalImage.value) {
-      return false
-    }
+const intervalWantsImage = computed(() => interval.value === 'imagem' || interval.value === 'texto+imagem')
+
+const intervalWantsText = computed(() => interval.value === 'texto' || interval.value === 'texto+imagem')
+
+const intervalMissing = computed(() => {
+  const image = intervalWantsImage.value && !intervalImage.value
+  const text = intervalWantsText.value && !intervalText.value.trim()
+  if (image && text) {
+    return 'Falta o texto e a imagem do intervalo.'
   }
-  if (interval.value === 'texto' || interval.value === 'texto+imagem') {
-    if (!intervalText.value.trim()) {
-      return false
-    }
+  if (image) {
+    return 'Falta a imagem do intervalo.'
   }
-  return true
+  if (text) {
+    return 'Falta o texto do intervalo.'
+  }
+  return ''
 })
+
+const intervalReady = computed(() => !intervalMissing.value)
 
 const seasonLabel = computed(() => {
   const season = chosenCover.value?.season || liturgy.value?.season
@@ -185,8 +191,6 @@ function dayToken(token, word) {
   return token.startsWith(word)
 }
 
-const coverLabel = computed(() => COVERS.find((item) => item.id === cover.value)?.label || cover.value)
-
 const liturgyUrl = computed(() => {
   const [year, month, day] = (date.value || '').split('-')
   if (!year || !month || !day) {
@@ -235,6 +239,9 @@ const folderLeaf = computed(() => {
 const credoGlance = computed(() => (credo.value === 'breve' ? 'Credo breve' : 'Credo longo'))
 
 const intervalGlance = computed(() => {
+  if (!intervalReady.value) {
+    return 'intervalo por completar'
+  }
   if (interval.value === 'imagem') {
     return 'intervalo com imagem'
   }
@@ -246,6 +253,11 @@ const intervalGlance = computed(() => {
   }
   return 'intervalo em branco'
 })
+
+function showChoices() {
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  deckChoices.value?.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' })
+}
 
 const canGenerate = computed(() =>
   liturgy.value && !liturgyError.value && output.value.trim() && intervalReady.value && !loading.value)
@@ -305,11 +317,6 @@ function automaticCover() {
 
 function sameText(current, original) {
   return (current || '').trim() === (original || '').trim()
-}
-
-function shown(value) {
-  const text = (value || '').trim()
-  return text || '-'
 }
 
 function hasStoredSentences(source) {
@@ -386,6 +393,34 @@ const readingsDirty = computed(() => {
   return scripturesAltered()
 })
 
+const louvorRows = computed(() => {
+  const lines = (form.louvor || '').split(/\r?\n/).length
+  return Math.min(Math.max(lines, 2), 6)
+})
+
+const coverEffect = computed(() => {
+  if (!liturgy.value) {
+    return ''
+  }
+  if (lenten.value) {
+    return 'Não se diz o Glória. A aclamação ao Evangelho é o Louvor a Vós'
+  }
+  if (omitsGloria.value) {
+    return 'Não se diz o Glória.'
+  }
+  return ''
+})
+
+const readingNote = computed(() => {
+  if (readingsDirty.value && scripturesStored.value) {
+    return 'Estas alterações são válidas apenas para este domingo ou celebração e não substituem as ocorrências futuras.'
+  }
+  if (!scripturesStored.value) {
+    return 'Ao gerar a apresentação, estas leituras ficam guardadas para a próxima vez que esta celebração se repetir.'
+  }
+  return ''
+})
+
 function onCoverPick() {
   if (accentTouched.value) {
     return
@@ -410,13 +445,6 @@ function revertReadings() {
     showAccent(useSolemnity.value && day.solemnity ? day.solemnity.accent : day.accent)
   }
 }
-
-watch(readingsOpen, (open) => {
-  if (!open) {
-    return
-  }
-  nextTick(() => readingsDialog.value?.focus())
-})
 
 function showAccent(id) {
   const swatch = ACCENTS.find((item) => item.id === id)
@@ -650,7 +678,6 @@ async function loadLiturgy() {
   loadCelebrations(requested)
   loading.value = true
   accentTouched.value = false
-  readingsOpen.value = false
   useSolemnity.value = false
   liturgyError.value = ''
   error.value = ''
@@ -1151,7 +1178,11 @@ async function generate(force = false, replace = false) {
             <input v-model.lazy="date" type="date" />
           </label>
           <span v-if="dayLine">{{ dayLine }}</span>
-          <span>{{ credoGlance }} · {{ intervalGlance }}</span>
+          <span class="catalog-choices">
+            <button type="button" class="catalog-jump" @click="showChoices">{{ credoGlance }}</button>
+            ·
+            <button type="button" class="catalog-jump" @click="showChoices">{{ intervalGlance }}</button>
+          </span>
         </p>
       </div>
     </header>
@@ -1192,6 +1223,7 @@ async function generate(force = false, replace = false) {
       </div>
       <p v-if="folder" class="path-full">{{ folder }}</p>
       <p v-if="openMoments.length" class="open-names">Ainda por preencher: {{ openMoments.map((moment) => moment.label).join(', ') }}.</p>
+      <p v-if="intervalMissing" class="open-names">{{ intervalMissing }}</p>
       <p class="shape-swap"><button type="button" @click="emit('other-shape')">Usar lista de cânticos</button></p>
       <p v-if="error" class="status error">{{ error }}</p>
     </section>
@@ -1266,31 +1298,79 @@ async function generate(force = false, replace = false) {
       />
     </div>
 
+    <section ref="deckChoices" class="panel deck-choices">
+      <h2>Credo, oração e intervalo</h2>
+      <div class="choice-grid">
+        <div class="deck-field">
+          <span id="credo-label">Credo</span>
+          <div class="kind" role="radiogroup" aria-labelledby="credo-label">
+            <label>
+              <input v-model="credo" type="radio" name="credo" value="longo" />
+              <span>Longo</span>
+            </label>
+            <label>
+              <input v-model="credo" type="radio" name="credo" value="breve" />
+              <span>Breve</span>
+            </label>
+          </div>
+        </div>
+        <label class="deck-field">
+          <span>Resposta da oração universal (opcional)</span>
+          <input v-model="oracao" type="text" placeholder="Ouvi-nos, Senhor" aria-label="Resposta da oração universal" />
+        </label>
+        <div class="deck-field interval-choice">
+          <span id="interval-label">Intervalo entre cânticos</span>
+          <div class="kind" role="radiogroup" aria-labelledby="interval-label">
+            <label>
+              <input v-model="interval" type="radio" name="interval" value="vazio" />
+              <span>Em branco</span>
+            </label>
+            <label>
+              <input v-model="interval" type="radio" name="interval" value="imagem" />
+              <span>Imagem</span>
+            </label>
+            <label>
+              <input v-model="interval" type="radio" name="interval" value="texto" />
+              <span>Texto</span>
+            </label>
+            <label>
+              <input v-model="interval" type="radio" name="interval" value="texto+imagem" />
+              <span>Texto e imagem</span>
+            </label>
+          </div>
+        </div>
+      </div>
+      <div v-if="intervalWantsText || intervalWantsImage" class="interval-detail">
+        <label v-if="intervalWantsText" class="deck-field">
+          <span>Texto</span>
+          <input v-model="intervalText" type="text" aria-label="Texto do intervalo" />
+        </label>
+        <div v-if="intervalWantsImage" class="deck-field">
+          <span>Imagem</span>
+          <div class="path-row">
+            <input :value="intervalImage" type="text" readonly placeholder="Nenhuma imagem escolhida" aria-label="Imagem do intervalo" />
+            <button class="browse" type="button" title="Escolher imagem" aria-label="Escolher imagem" @click="chooseImage">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <path d="M3 7.5A1.5 1.5 0 0 1 4.5 6H9l2 2h8.5A1.5 1.5 0 0 1 21 9.5v8A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5v-10z" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+      <p v-if="intervalMissing" class="interval-missing">{{ intervalMissing }}</p>
+    </section>
+
     <section v-if="liturgy" class="panel cover">
       <div class="panel-head">
         <h2>Capa e leituras</h2>
-        <div class="panel-actions">
-          <button
-            v-if="readingsDirty"
-            class="text-action"
-            type="button"
-            title="Repor as leituras"
-            aria-label="Repor as leituras"
-            @click="revertReadings"
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-              <path d="M3 12a9 9 0 1 0 2.5-6.2" />
-              <path d="M3 4v5h5" />
-            </svg>
-          </button>
-          <button class="text-action" type="button" @click="readingsOpen = true">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-              <path d="M12 20h9" />
-              <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
-            </svg>
-            Editar
-          </button>
-        </div>
+        <button
+          v-if="readingsDirty"
+          class="text-action"
+          type="button"
+          @click="revertReadings"
+        >
+          Repor
+        </button>
       </div>
       <div v-if="liturgy.warnings?.length" class="warnings">
         <p v-for="(warning, index) in liturgy.warnings" :key="warning">
@@ -1303,128 +1383,52 @@ async function generate(force = false, replace = false) {
           >Abrir liturgia.pt para consultar</a>
         </p>
       </div>
-      <div class="readings">
-        <div class="reading">
-          <span>Capa</span>
-          <p>{{ coverLabel }}</p>
-        </div>
-        <div v-if="liturgy.primeira" class="reading">
-          <span>Primeira leitura <em v-if="form.primeiraRef">{{ form.primeiraRef }}</em></span>
-          <p :class="{ empty: !form.primeira.trim() }">{{ shown(form.primeira) }}</p>
-        </div>
-        <div class="reading">
-          <span>Salmo</span>
-          <p :class="{ empty: !form.salmo.trim() }">{{ shown(form.salmo) }}</p>
-        </div>
-        <div v-if="liturgy.segunda" class="reading">
-          <span>Segunda leitura <em v-if="form.segundaRef">{{ form.segundaRef }}</em></span>
-          <p :class="{ empty: !form.segunda.trim() }">{{ shown(form.segunda) }}</p>
-        </div>
-        <div v-if="lenten" class="reading">
-          <span>Louvor</span>
-          <p :class="{ empty: !form.louvor.trim() }">{{ shown(form.louvor) }}</p>
-        </div>
-        <div class="reading">
-          <span>Evangelho <em v-if="form.versiculo">{{ form.versiculo }}</em></span>
-          <p :class="{ empty: !form.frase.trim() }">{{ shown(form.frase) }}</p>
-        </div>
-      </div>
-    </section>
-
-    <section class="panel options">
-      <h2>Opções</h2>
-      <div class="stack">
-        <label class="field">
-          <span>Credo</span>
-          <select v-model="credo">
-            <option value="longo">Credo longo</option>
-            <option value="breve">Credo breve</option>
-          </select>
-        </label>
-        <label class="field wide">
-          <span>Resposta da oração universal (opcional)</span>
-          <input v-model="oracao" type="text" placeholder="Ouvi-nos, Senhor" />
-        </label>
-        <label class="field">
-          <span>Intervalo entre slides</span>
-          <select v-model="interval">
-            <option value="vazio">Em branco</option>
-            <option value="imagem">Imagem</option>
-            <option value="texto">Texto</option>
-            <option value="texto+imagem">Texto e imagem</option>
-          </select>
-        </label>
-        <label v-if="interval === 'texto' || interval === 'texto+imagem'" class="field wide">
-          <span>Texto do intervalo</span>
-          <input v-model="intervalText" type="text" />
-        </label>
-        <div v-if="interval === 'imagem' || interval === 'texto+imagem'" class="field wide">
-          <span>Imagem do intervalo</span>
-          <div class="path-row">
-            <input :value="intervalImage" type="text" readonly placeholder="Nenhuma imagem escolhida" />
-            <button class="browse" type="button" title="Escolher imagem" aria-label="Escolher imagem" @click="chooseImage">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                <path d="M3 7.5A1.5 1.5 0 0 1 4.5 6H9l2 2h8.5A1.5 1.5 0 0 1 21 9.5v8A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5v-10z" />
-              </svg>
-            </button>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <div v-if="readingsOpen" class="modal-backdrop" @click.self="readingsOpen = false">
-      <div
-        ref="readingsDialog"
-        class="modal readings-editor"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="readings-title"
-        tabindex="-1"
-        @keydown.esc="readingsOpen = false"
-      >
-        <button class="icon close" type="button" aria-label="Fechar" @click="readingsOpen = false">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-            <path d="M6 6l12 12M18 6 6 18" />
-          </svg>
-        </button>
-        <h2 id="readings-title">Capa e leituras</h2>
-        <div class="readings-scroll">
-        <p v-if="scripturesStored" class="note">Estas alterações são válidas apenas para este domingo ou celebração e não substituem as ocorrências futuras.</p>
-        <p v-else class="note">Ao gerar a apresentação, estas leituras ficam guardadas para a próxima vez que esta celebração se repetir.</p>
-        <div class="readings">
-          <label class="reading">
-            <span>Capa</span>
-            <select v-model="cover" aria-label="Capa" @change="onCoverPick">
+      <p v-if="readingNote" class="reading-note">{{ readingNote }}</p>
+      <div class="reading-grid">
+        <div class="reading-row">
+          <label for="cover-field">Capa</label>
+          <div class="reading-fields">
+            <select id="cover-field" v-model="cover" @change="onCoverPick">
               <option v-for="item in COVERS" :key="item.id" :value="item.id">{{ item.label }}</option>
             </select>
-          </label>
-          <div v-if="liturgy?.primeira" class="reading">
-            <span>Primeira leitura</span>
+            <p v-if="coverEffect" class="cover-effect">{{ coverEffect }}</p>
+          </div>
+        </div>
+        <div v-if="liturgy.primeira" class="reading-row">
+          <span>Primeira leitura</span>
+          <span class="reading-fields pair">
             <input v-model="form.primeiraRef" type="text" placeholder="Referência" aria-label="Referência da primeira leitura" />
             <input v-model="form.primeira" type="text" placeholder="Citação" aria-label="Primeira leitura" />
-          </div>
-          <label class="reading">
-            <span>Salmo</span>
+          </span>
+        </div>
+        <div class="reading-row">
+          <span>Salmo</span>
+          <span class="reading-fields">
             <input v-model="form.salmo" type="text" placeholder="Refrão" aria-label="Salmo" />
-          </label>
-          <div v-if="liturgy?.segunda" class="reading">
-            <span>Segunda leitura</span>
+          </span>
+        </div>
+        <div v-if="liturgy.segunda" class="reading-row">
+          <span>Segunda leitura</span>
+          <span class="reading-fields pair">
             <input v-model="form.segundaRef" type="text" placeholder="Referência" aria-label="Referência da segunda leitura" />
             <input v-model="form.segunda" type="text" placeholder="Citação" aria-label="Segunda leitura" />
-          </div>
-          <label v-if="lenten" class="reading">
-            <span>Louvor</span>
-            <input v-model="form.louvor" type="text" placeholder="Citação" aria-label="Louvor" />
-          </label>
-          <div class="reading">
-            <span>Evangelho</span>
+          </span>
+        </div>
+        <div v-if="lenten" class="reading-row">
+          <span>Aclamação</span>
+          <span class="reading-fields">
+            <textarea v-model="form.louvor" :rows="louvorRows" placeholder="Citação" aria-label="Aclamação"></textarea>
+          </span>
+        </div>
+        <div class="reading-row">
+          <span>Evangelho</span>
+          <span class="reading-fields pair">
             <input v-model="form.versiculo" type="text" placeholder="Referência" aria-label="Referência do Evangelho" />
             <input v-model="form.frase" type="text" placeholder="Citação" aria-label="Evangelho" />
-          </div>
-        </div>
+          </span>
         </div>
       </div>
-    </div>
+    </section>
     <div v-if="missingPrompt.length" class="modal-backdrop" @click.self="missingPrompt = []">
       <div class="modal confirm" role="dialog" aria-modal="true" aria-labelledby="missing-songs">
         <p id="missing-songs">Faltam os seguintes cânticos: {{ listed(missingPrompt) }}.</p>
