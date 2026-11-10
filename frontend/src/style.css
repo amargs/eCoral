@@ -1321,33 +1321,60 @@ header .alter svg {
   text-overflow: ellipsis;
 }
 
+.choice-tokens {
+  display: inline-flex;
+  flex: none;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.1rem;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.choice-tokens:not(:has(.choice-token)) {
+  display: none;
+}
+
+.choice-token {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.4rem;
+  padding: 0.05rem 0.4rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: #fff;
+  color: var(--ink);
+  font-size: 0.75rem;
+  font-weight: 400;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+button.choice-token:hover {
+  background: #eeeae2;
+}
+
+button.choice-token[aria-expanded="true"] {
+  color: var(--accent-ink);
+  background: var(--accent-soft);
+  border-color: color-mix(in srgb, var(--accent) 35%, #c8c1b4);
+}
+
+.choice-token.is-changed {
+  color: var(--accent-ink);
+  font-weight: 650;
+}
+
 .estrofe-menu-anchor {
   position: relative;
   flex: none;
   display: inline-flex;
 }
-.estrofe-menu-anchor > button.icon svg,
-button.icon.language-toggle svg {
-  width: 1.2rem;
-  height: 1.2rem;
-}
 
-button.icon.language-toggle:active,
-button.icon.language-on {
-  color: var(--accent-ink);
-  background: var(--accent-soft);
-  border-color: color-mix(in srgb, var(--accent) 35%, #c8c1b4);
-}
-
-button.icon.language-on {
-  border-color: var(--accent);
-}
-
-.estrofe-menu-anchor > button.icon:active,
-.estrofe-menu-anchor > button.icon[aria-expanded="true"] {
-  color: var(--accent-ink);
-  background: var(--accent-soft);
-  border-color: color-mix(in srgb, var(--accent) 35%, #c8c1b4);
+.moments li > button.icon,
+.row-actions button.icon {
+  width: 2.5rem;
+  height: 2.5rem;
 }
 
 .estrofe-menu {
@@ -1411,10 +1438,14 @@ button.icon.language-on {
   font-weight: 400;
 }
 
+.estrofe.locked {
+  cursor: default;
+}
+
 .estrofe-n {
   flex: none;
   width: 1.1rem;
-  color: #8a8378;
+  color: var(--muted);
   font-variant-numeric: tabular-nums;
   font-size: 0.85rem;
 }
@@ -1426,13 +1457,21 @@ button.icon.language-on {
   white-space: nowrap;
 }
 
+.estrofe-menu.narrow .estrofe-line,
+.estrofe-menu.narrow .estrofe-where {
+  overflow: visible;
+  text-overflow: unset;
+  white-space: normal;
+}
+
 .estrofe-refrain {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
   gap: 0.4rem;
   margin-top: 0.2rem;
   padding: 0.28rem 0 0.1rem;
-  color: #6f6962;
+  color: var(--muted);
   font-size: 0.85rem;
 }
 
@@ -1442,8 +1481,8 @@ button.icon.language-on {
 }
 
 .estrofe-where {
-  flex: none;
-  color: #8a8378;
+  flex: 1 1 auto;
+  color: var(--muted);
 }
 
 .estrofe-where::before {
@@ -2111,6 +2150,10 @@ button.icon.drag-handle:active {
 
 .chosen-song .song-name {
   min-height: calc(1.4em + 0.78rem * 1.25);
+}
+
+.chosen-song .song-name:has(.choice-token) {
+  justify-content: center;
 }
 
 .chosen-detail {

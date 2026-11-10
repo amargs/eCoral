@@ -1,7 +1,7 @@
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import SongList from './SongList.vue'
-import { ACCENTS, COVERS, MOMENTS, SEASONS, comingSunday, estrofeCountLabel, keepEstrofes, languageLabel, preferredLyrics, rememberedChoice, slideChoice, withShow } from '../songs.js'
+import { ACCENTS, COVERS, MOMENTS, SEASONS, comingSunday, keepEstrofes, preferredLyrics, rememberedChoice, slideChoice, withShow } from '../songs.js'
 import Estrofes from './Estrofes.vue'
 import SongShow from './SongShow.vue'
 
@@ -1006,6 +1006,12 @@ function pick(song) {
   slots[active.value] = withShow(song)
 }
 
+function chooseShow(id, patch) {
+  active.value = id
+  if (estrofesOpen.value && estrofesOpen.value !== id) estrofesOpen.value = ''
+  setShow(id, patch)
+}
+
 function setShow(moment, patch) {
   const song = slots[moment]
   if (!song) return
@@ -1341,7 +1347,7 @@ async function generate(force = false, replace = false) {
                 @click="chooseMoment(moment.id)"
               >
                 <span class="mark" :class="{ filled: moment.fixed || moment.optional || !!slots[moment.id] }" aria-hidden="true"></span>
-                <span class="moment-name" :class="{ waiting: !moment.fixed && !moment.optional && !slots[moment.id] }">{{ moment.label }}<template v-if="active === moment.id && languageLabel(slots[moment.id])"> · {{ languageLabel(slots[moment.id]) }}</template><template v-if="active === moment.id && estrofeCountLabel(slots[moment.id])"> · {{ estrofeCountLabel(slots[moment.id]) }}</template></span>
+                <span class="moment-name" :class="{ waiting: !moment.fixed && !moment.optional && !slots[moment.id] }">{{ moment.label }}</span>
                 <span class="moment-book">
                   <Transition name="moment-swap">
                     <span v-if="rowSong(moment)?.bookId" :key="rowSong(moment).id" class="book book-badge">{{ rowSong(moment).bookId }}</span>
@@ -1357,16 +1363,17 @@ async function generate(force = false, replace = false) {
                 </span>
               </button>
             </div>
-            <SongShow v-if="!moment.fixed && active === moment.id && slots[moment.id]" :song="slots[moment.id]" @change="setShow(moment.id, $event)" />
-            <Estrofes
-              v-if="!moment.fixed && active === moment.id && slots[moment.id]"
-              compact
-              :song="slots[moment.id]"
-              :open="estrofesOpen === moment.id"
-              @open="showEstrofes(moment.id)"
-              @close="closeEstrofes"
-              @change="setShow(moment.id, $event)"
-            />
+            <span v-if="!moment.fixed && slots[moment.id]" class="choice-tokens">
+              <SongShow :song="slots[moment.id]" @change="chooseShow(moment.id, $event)" />
+              <Estrofes
+                compact
+                :song="slots[moment.id]"
+                :open="estrofesOpen === moment.id"
+                @open="showEstrofes(moment.id)"
+                @close="closeEstrofes"
+                @change="setShow(moment.id, $event)"
+              />
+            </span>
             <button
               v-if="!moment.fixed && slots[moment.id]"
               type="button"

@@ -151,6 +151,7 @@ export function estrofeCountLabel(song) {
   } else if (Number.isInteger(raw) && raw > 0 && raw < rows.length) {
     count = rows.filter((n) => n <= raw).length
   }
+  if (count === rows.length) return 'Todas as estrofes'
   return count === 1 ? '1 estrofe' : `${count} estrofes`
 }
 
