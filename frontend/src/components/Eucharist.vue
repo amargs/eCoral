@@ -243,7 +243,7 @@ const railHeading = computed(() => {
   if (!armedMoment.value) {
     return 'Procurar'
   }
-  return `Escolher ${armedMoment.value.label}`
+  return `Escolher ${armedMoment.value.label.toLocaleLowerCase('pt')}`
 })
 
 const assignLabel = computed(() =>
