@@ -2378,6 +2378,52 @@ button.icon.row-remove:hover {
   overflow-wrap: anywhere;
 }
 
+.song-notices {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.35rem;
+  margin: 0.9rem 0 0;
+}
+
+.song-notices button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  width: auto;
+  max-width: 100%;
+  margin: 0;
+  padding: 0.4rem 0.65rem;
+  border: 1px solid #e4d3a8;
+  border-radius: 8px;
+  background: #fff8e8;
+  color: var(--ink);
+  font-size: 0.95rem;
+  line-height: 1.45;
+  text-align: left;
+  cursor: pointer;
+}
+
+.song-notices button svg {
+  flex: none;
+  width: 1.05rem;
+  height: 1.05rem;
+}
+
+.song-notices button span {
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--ink) 45%, transparent);
+  text-underline-offset: 0.18em;
+}
+
+.song-notices button:hover {
+  background: #f3e6c4;
+}
+
+.song-notices button:hover span {
+  text-decoration-color: var(--ink);
+}
+
 .readings-toggle {
   gap: 0.4rem;
   color: #5c564c;

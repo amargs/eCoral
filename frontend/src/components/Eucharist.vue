@@ -52,7 +52,6 @@ const error = ref('')
 const fileOpen = ref('')
 const busy = ref(false)
 let liturgyRequest = 0
-const missingPrompt = ref([])
 const replaceName = ref('')
 let saveReady = props.draft == null
 let restorePending = props.draft != null
@@ -236,6 +235,13 @@ const openCount = computed(() =>
 
 const openMoments = computed(() =>
   rows.value.filter((moment) => !moment.fixed && !moment.optional && !slots[moment.id]))
+
+const songNotices = computed(() => {
+  if (!openMoments.value.length) {
+    return []
+  }
+  return [{ key: 'empty', text: 'Há momentos sem cântico.', moment: openMoments.value[0].id }]
+})
 
 const armedMoment = computed(() => rows.value.find((moment) => moment.id === active.value))
 
@@ -1040,6 +1046,16 @@ function chooseMoment(id) {
   active.value = id
 }
 
+function showNotice(notice) {
+  if (!notice.moment) {
+    return
+  }
+  chooseMoment(notice.moment)
+  nextTick(() => {
+    document.getElementById(`moment-${notice.moment}`)?.scrollIntoView({ block: 'nearest' })
+  })
+}
+
 function showEstrofes(id) {
   active.value = id
   estrofesOpen.value = estrofesOpen.value === id ? '' : id
@@ -1076,21 +1092,6 @@ function changed(current, original) {
   return next !== previous && next
 }
 
-const OPTIONAL_SONGS = new Set(['gloria', 'paiNosso'])
-
-function missingSongLabels() {
-  return moments.value
-    .filter((moment) => !moment.fixed && !OPTIONAL_SONGS.has(moment.id) && !slots[moment.id])
-    .map((moment) => moment.label)
-}
-
-function listed(names) {
-  if (names.length < 2) {
-    return names[0] || ''
-  }
-  return `${names.slice(0, -1).join(', ')} e ${names[names.length - 1]}`
-}
-
 async function pickAnotherName() {
   replaceName.value = ''
   await nextTick()
@@ -1098,13 +1099,7 @@ async function pickAnotherName() {
   outputInput.value?.select()
 }
 
-async function generate(force = false, replace = false) {
-  const missing = missingSongLabels()
-  if (force !== true && missing.length) {
-    missingPrompt.value = missing
-    return
-  }
-  missingPrompt.value = []
+async function generate(replace = false) {
   replaceName.value = ''
   error.value = ''
   fileOpen.value = ''
@@ -1324,7 +1319,24 @@ async function generate(force = false, replace = false) {
         </button>
       </div>
       <p v-if="folder" class="path-full">{{ folder }}</p>
-      <p v-if="openMoments.length" class="open-names">Ainda por preencher: {{ openMoments.map((moment) => moment.label).join(', ') }}.</p>
+      <div v-if="songNotices.length" class="song-notices" role="group" aria-label="Avisos">
+        <button
+          v-for="notice in songNotices"
+          :key="notice.key"
+          type="button"
+          @click="showNotice(notice)"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path stroke-linejoin="round" d="M12 4.2 21.2 20H2.8L12 4.2z" />
+            <path stroke-linecap="round" d="M12 10v4.2" />
+            <path stroke-linecap="round" d="M12 17.2h.01" />
+          </svg>
+          <span>{{ notice.text }}</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 6l6 6-6 6" />
+          </svg>
+        </button>
+      </div>
       <p v-if="intervalMissing" class="open-names">{{ intervalMissing }}</p>
       <p class="shape-swap"><button type="button" @click="emit('other-shape')">Usar lista de cânticos</button></p>
       <p v-if="error" class="status error">{{ error }}</p>
@@ -1338,6 +1350,7 @@ async function generate(force = false, replace = false) {
             <div class="moment-pick">
               <button
                 type="button"
+                :id="'moment-' + moment.id"
                 class="moment"
                 :class="{ armed: !moment.fixed && active === moment.id }"
                 :disabled="moment.fixed"
@@ -1531,16 +1544,6 @@ async function generate(force = false, replace = false) {
         </div>
       </div>
     </section>
-    <div v-if="missingPrompt.length" class="modal-backdrop" @click.self="missingPrompt = []">
-      <div class="modal confirm" role="dialog" aria-modal="true" aria-labelledby="missing-songs">
-        <p id="missing-songs">Faltam os seguintes cânticos: {{ listed(missingPrompt) }}.</p>
-        <p>Quer gerar mesmo assim?</p>
-        <div class="open-actions">
-          <button type="button" @click="missingPrompt = []">Voltar a editar</button>
-          <button class="primary" type="button" @click="generate(true)">Gerar mesmo assim</button>
-        </div>
-      </div>
-    </div>
     <div v-if="fileOpen" class="modal-backdrop" @click.self="fileOpen = ''">
       <div class="modal confirm" role="dialog" aria-modal="true" aria-labelledby="file-open" @keydown.esc="fileOpen = ''">
         <p id="file-open" class="file-open">{{ fileOpen }}</p>
@@ -1554,7 +1557,7 @@ async function generate(force = false, replace = false) {
         <p id="replace-file">Já existe um ficheiro com o nome {{ replaceName }}. Quer substituí-lo?</p>
         <div class="open-actions">
           <button type="button" @click="pickAnotherName">Escolher outro nome</button>
-          <button class="primary" type="button" @click="generate(true, true)">Substituir</button>
+          <button class="primary" type="button" @click="generate(true)">Substituir</button>
         </div>
       </div>
     </div>
