@@ -62,6 +62,9 @@ const restoring = ref(props.draft != null)
 let saveTimer = 0
 let persistTail = Promise.resolve()
 
+const louvorSong = computed(() =>
+  props.songs.find((song) => foldDay(song.title) === 'louvor a vos') || null)
+
 const rows = computed(() => {
   const list = []
   for (const moment of MOMENTS) {
@@ -69,7 +72,11 @@ const rows = computed(() => {
       continue
     }
     if (moment.id === 'aleluia' && lenten.value) {
-      list.push({ id: 'louvor', label: 'Louvor a vós', fixed: true })
+      list.push({
+        ...moment,
+        fixed: true,
+        song: louvorSong.value || { id: 'louvor-a-vos', title: 'Louvor a Vós', bookId: '' },
+      })
       continue
     }
     list.push({
@@ -938,6 +945,10 @@ function unpick(id) {
   }
 }
 
+function rowSong(moment) {
+  return moment.song || slots[moment.id] || null
+}
+
 function chooseMoment(id) {
   if (active.value !== id) estrofesOpen.value = ''
   active.value = id
@@ -1245,14 +1256,13 @@ async function generate(force = false, replace = false) {
                 <span class="moment-name" :class="{ waiting: !moment.fixed && !moment.optional && !slots[moment.id] }">{{ moment.label }}<template v-if="active === moment.id && languageLabel(slots[moment.id])"> · {{ languageLabel(slots[moment.id]) }}</template><template v-if="active === moment.id && estrofeCountLabel(slots[moment.id])"> · {{ estrofeCountLabel(slots[moment.id]) }}</template></span>
                 <span class="moment-book">
                   <Transition name="moment-swap">
-                    <span v-if="slots[moment.id]" :key="slots[moment.id].id" class="book book-badge">{{ slots[moment.id].bookId || '#' }}</span>
+                    <span v-if="rowSong(moment)?.bookId" :key="rowSong(moment).id" class="book book-badge">{{ rowSong(moment).bookId }}</span>
                     <span v-else key="empty" class="book wait">—</span>
                   </Transition>
                 </span>
                 <span class="moment-song-slot">
                   <Transition name="moment-swap">
-                    <span v-if="moment.fixed" key="fixed" class="moment-song">{{ form.louvor || 'O refrão fica no diapositivo' }}</span>
-                    <span v-else-if="slots[moment.id]" :key="slots[moment.id].id" class="moment-song picked">{{ slots[moment.id].title }}</span>
+                    <span v-if="rowSong(moment)" :key="rowSong(moment).id" class="moment-song picked">{{ rowSong(moment).title }}</span>
                     <span v-else-if="moment.optional" key="rezado" class="moment-song">Rezado</span>
                     <span v-else key="empty" class="moment-song missing">Por escolher</span>
                   </Transition>
@@ -1270,7 +1280,7 @@ async function generate(force = false, replace = false) {
               @change="setShow(moment.id, $event)"
             />
             <button
-              v-if="slots[moment.id]"
+              v-if="!moment.fixed && slots[moment.id]"
               type="button"
               class="icon row-remove"
               title="Remover cântico"
