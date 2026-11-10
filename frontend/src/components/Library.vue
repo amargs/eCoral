@@ -1,5 +1,6 @@
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref } from 'vue'
+import { vClipTitle } from '../clipTitle.js'
 import VerseList from './VerseList.vue'
 import { SEASONS, byBookId, languageName, matches, otherLanguage } from '../songs.js'
 
@@ -556,7 +557,7 @@ onUnmounted(() => {
                 <span class="book-badge">{{ song.bookId || '#' }}</span>
                 <span class="song-name">
                   {{ song.title }}
-                  <span class="title-alt">{{ song.titleAlt ? `(${song.titleAlt})` : '' }}</span>
+                  <span v-clip-title class="title-alt">{{ song.titleAlt ? `(${song.titleAlt})` : '' }}</span>
                 </span>
               </span>
               <span v-if="!song.hasVerses" class="missing">sem letra</span>

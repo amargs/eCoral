@@ -1,5 +1,6 @@
 <script setup>
 import { computed } from 'vue'
+import { vClipTitle } from '../clipTitle.js'
 import { byBookId, matches } from '../songs.js'
 
 const props = defineProps({
@@ -52,7 +53,7 @@ const visible = computed(() =>
           <span class="book-badge">{{ song.bookId || '#' }}</span>
           <span class="song-name">
             {{ song.title }}
-            <span class="title-alt">{{ song.titleAlt ? `(${song.titleAlt})` : '' }}</span>
+            <span v-clip-title class="title-alt">{{ song.titleAlt ? `(${song.titleAlt})` : '' }}</span>
           </span>
         </span>
         <span v-if="!song.hasVerses" class="missing">sem letra</span>
