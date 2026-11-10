@@ -243,9 +243,6 @@ const railHeading = computed(() => {
   if (!armedMoment.value) {
     return 'Procurar'
   }
-  if (armedMoment.value.id === 'aleluia') {
-    return 'aleluia'
-  }
   return `Escolher ${armedMoment.value.label}`
 })
 
