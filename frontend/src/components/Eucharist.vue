@@ -34,7 +34,6 @@ const form = reactive({
 })
 const useSolemnity = ref(false)
 const cover = ref('')
-const deckChoices = ref(null)
 const accent = ref('accent1')
 const accentTouched = ref(false)
 const slots = reactive({})
@@ -128,8 +127,6 @@ const lenten = computed(() => (
   chosenCover.value?.season ? !!chosenCover.value.lenten : !!liturgy.value?.lenten
 ))
 
-const accentChoice = computed(() => ACCENTS.find((item) => item.id === accent.value) || ACCENTS[0])
-
 const celebrations = ref([])
 const celebrationSpan = ref({ from: '', until: '' })
 const daySearch = ref(null)
@@ -140,19 +137,14 @@ const daySpanning = ref(false)
 let daySnapshot = ''
 let daySpanTicket = 0
 
-const dayLine = computed(() => {
-  const parts = []
-  if (liturgy.value?.ano) {
-    parts.push(`Ano ${liturgy.value.ano}`)
-  }
-  if (seasonLabel.value) {
-    parts.push(seasonLabel.value)
-  }
-  if (liturgy.value) {
-    parts.push(accentChoice.value.name.toLowerCase())
-  }
-  return parts.join(' · ')
-})
+const massHead = ref(null)
+const catalogLine = ref(null)
+const seasonFact = ref(null)
+const yearFact = ref(null)
+const dateFact = ref(null)
+const COLLAPSE = 72
+let headScroll = null
+let headFrame = 0
 
 function foldDay(value) {
   return (value || '').normalize('NFD').replace(/\p{M}/gu, '').toLowerCase()
@@ -187,8 +179,41 @@ const dayHint = computed(() => (
   dayFiltering.value && !dayMatches.value.length ? 'Nenhum dia com esse nome.' : ''
 ))
 
+function daySeasonId(key) {
+  key = (key || '').split('/')[0]
+  if (key === 'palm-sunday') return 'ramos'
+  if (key === 'pentecost') return 'pentecostes'
+  if (key === 'christmas' || key === 'holy-family' || key === 'mary-mother-of-god' || key === 'epiphany' || key === 'baptism-of-the-lord') return 'natal'
+  if (key === 'immaculate-conception' || key.startsWith('advent-')) return 'advento'
+  if (key.startsWith('lent-')) return 'quaresma'
+  if (key === 'easter-sunday' || key.startsWith('easter-')) return 'pascoa'
+  if (key.startsWith('ordinary-') || key === 'trinity' || key === 'corpus-christi' || key === 'john-the-baptist' || key === 'peter-paul' || key === 'assumption' || key === 'all-saints') return 'comum'
+  return ''
+}
+
+function dayTitle(day) {
+  const season = SEASONS.find((item) => item.id === daySeasonId(day.key))?.label || ''
+  const name = day.name || ''
+  const parts = [name]
+  if (season && !foldDay(name).includes(foldDay(season))) {
+    parts.push(season)
+  }
+  if (day.ano) {
+    parts.push(`Ano ${day.ano}`)
+  }
+  return parts.filter(Boolean).join(' · ')
+}
+
+function dayDate(day) {
+  const [year, month, date] = (day.date || '').split('-')
+  if (!year || !month || !date) {
+    return ''
+  }
+  return `${date}/${month}/${year}`
+}
+
 function dayLabel(day) {
-  return day.ano ? `${day.name} · Ano ${day.ano}` : day.name
+  return [dayTitle(day), dayDate(day)].filter(Boolean).join(' ')
 }
 
 function dayToken(token, word) {
@@ -242,29 +267,6 @@ const folderLeaf = computed(() => {
   const parts = props.folder.split(/[/\\]/).filter(Boolean)
   return parts.at(-1) || ''
 })
-
-const credoGlance = computed(() => (credo.value === 'breve' ? 'Credo breve' : 'Credo longo'))
-
-const intervalGlance = computed(() => {
-  if (!intervalReady.value) {
-    return 'intervalo por completar'
-  }
-  if (interval.value === 'imagem') {
-    return 'intervalo com imagem'
-  }
-  if (interval.value === 'texto') {
-    return 'intervalo com texto'
-  }
-  if (interval.value === 'texto+imagem') {
-    return 'intervalo com texto e imagem'
-  }
-  return 'intervalo em branco'
-})
-
-function showChoices() {
-  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  deckChoices.value?.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' })
-}
 
 const canGenerate = computed(() =>
   liturgy.value && !liturgyError.value && output.value.trim() && intervalReady.value && !loading.value)
@@ -910,10 +912,91 @@ watch(() => JSON.stringify(draftBody()), () => {
   schedulePersist()
 })
 
-onMounted(() => window.addEventListener('pagehide', flushDraft))
+function syncHead() {
+  const head = massHead.value
+  const scroller = headScroll
+  if (!head || !scroller || dayOpen.value) {
+    return
+  }
+  const p = Math.min(1, Math.max(0, scroller.scrollTop / COLLAPSE))
+  head.style.setProperty('--p', p.toFixed(4))
+  head.classList.toggle('is-compact', p > 0.92)
+  const title = daySearch.value
+  const catalog = catalogLine.value
+  const facts = [seasonFact.value, yearFact.value, dateFact.value].filter(Boolean)
+  if (!title || !catalog || !facts.length) {
+    return
+  }
+  const lift = head.dataset.lift !== '0'
+  catalog.style.marginTop = `${0.45 * (1 - (lift ? p : 0))}rem`
+  catalog.style.marginBottom = lift ? `${-p * catalog.offsetHeight}px` : ''
+  const titleBox = title.getBoundingClientRect()
+  const headBox = head.getBoundingClientRect()
+  const titleMid = titleBox.top + titleBox.height / 2
+  let x = titleBox.right + 14
+  const moves = []
+  for (const el of facts) {
+    const matrix = new DOMMatrix(getComputedStyle(el).transform)
+    const box = el.getBoundingClientRect()
+    const top = box.top - matrix.m42
+    moves.push({
+      el,
+      tx: x - (box.left - matrix.m41),
+      ty: titleMid - box.height / 2 - top,
+    })
+    x += box.width + 12
+  }
+  const fits = x <= headBox.right - 4
+  head.dataset.lift = fits ? '1' : '0'
+  if (fits !== lift) {
+    catalog.style.marginTop = `${0.45 * (1 - (fits ? p : 0))}rem`
+    catalog.style.marginBottom = fits ? `${-p * catalog.offsetHeight}px` : ''
+  }
+  for (const move of moves) {
+    move.el.style.transform = fits ? `translate(${p * move.tx}px, ${p * move.ty}px)` : ''
+  }
+}
+
+function openPinnedDate(event) {
+  const input = event.currentTarget.closest('label')?.querySelector('input') || event.currentTarget
+  try {
+    input.showPicker()
+  } catch {
+    // The picker is already open, or this browser has none to show.
+  }
+}
+
+function queueHead() {
+  if (headFrame) {
+    return
+  }
+  headFrame = requestAnimationFrame(() => {
+    headFrame = 0
+    syncHead()
+  })
+}
+
+onMounted(() => {
+  window.addEventListener('pagehide', flushDraft)
+  headScroll = massHead.value?.closest('.app-body')
+  headScroll?.addEventListener('scroll', queueHead, { passive: true })
+  window.addEventListener('resize', queueHead)
+  queueHead()
+})
 onUnmounted(() => {
   window.removeEventListener('pagehide', flushDraft)
+  headScroll?.removeEventListener('scroll', queueHead)
+  window.removeEventListener('resize', queueHead)
+  if (headFrame) {
+    cancelAnimationFrame(headFrame)
+  }
   flushDraft()
+})
+
+watch(dayOpen, (open) => {
+  if (!open) {
+    queueHead()
+  }
 })
 
 function pick(song) {
@@ -1130,7 +1213,7 @@ async function generate(force = false, replace = false) {
 
 <template>
   <div class="deck">
-    <header class="mass-head">
+    <header ref="massHead" class="mass-head">
       <div class="specimen">
         <div ref="daySearch" class="day-search" :class="{ open: dayOpen, spanning: daySpanning }">
           <h1>
@@ -1177,23 +1260,28 @@ async function generate(force = false, replace = false) {
                 @mousedown.prevent
                 @click="pickDay(item)"
               >
-                <span>{{ dayLabel(item) }}</span>
+                <span>{{ dayTitle(item) }}</span>
+                <span v-if="dayDate(item)" class="day-date">{{ ' ' + dayDate(item) }}</span>
               </button>
             </li>
           </ul>
           </Transition>
         </div>
-        <p class="catalog">
-          <label>
-            Data
-            <input v-model.lazy="date" type="date" />
+        <p ref="catalogLine" class="catalog">
+          <span v-if="seasonLabel" ref="seasonFact" class="catalog-season">{{ seasonLabel }}</span>
+          <span v-if="liturgy?.ano" ref="yearFact" class="catalog-fact">Ano {{ liturgy.ano }}</span>
+          <label ref="dateFact" class="catalog-date">
+            <span class="catalog-date-name">Data</span>
+            <span class="catalog-date-value">
+              <input v-model.lazy="date" type="date" aria-label="Data" @click="openPinnedDate" />
+              <button type="button" class="catalog-calendar" tabindex="-1" aria-label="Escolher a data" @click="openPinnedDate">
+                <svg viewBox="0 0 16 16" aria-hidden="true">
+                  <rect x="2.25" y="3.25" width="11.5" height="10.5" rx="1.4" />
+                  <path d="M2.25 6.5h11.5M5.5 1.75v2.5M10.5 1.75v2.5" />
+                </svg>
+              </button>
+            </span>
           </label>
-          <span v-if="dayLine">{{ dayLine }}</span>
-          <span class="catalog-choices">
-            <button type="button" class="catalog-jump" @click="showChoices">{{ credoGlance }}</button>
-            ·
-            <button type="button" class="catalog-jump" @click="showChoices">{{ intervalGlance }}</button>
-          </span>
         </p>
       </div>
     </header>
@@ -1308,7 +1396,7 @@ async function generate(force = false, replace = false) {
       />
     </div>
 
-    <section ref="deckChoices" class="panel deck-choices">
+    <section class="panel deck-choices">
       <h2>Credo, oração e intervalo</h2>
       <div class="choice-grid">
         <div class="deck-field">
