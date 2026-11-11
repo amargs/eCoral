@@ -4,14 +4,16 @@ import SongList from './SongList.vue'
 import { ACCENTS, COVERS, MOMENTS, SEASONS, comingSunday, keepEstrofes, preferredLyrics, rememberedChoice, slideChoice, withShow } from '../songs.js'
 import Estrofes from './Estrofes.vue'
 import SongShow from './SongShow.vue'
+import ShapeLine from './ShapeLine.vue'
 
 const props = defineProps({
   songs: { type: Array, required: true },
   folder: { type: String, required: true },
   draft: { type: Object, default: null },
+  shape: { type: String, required: true },
 })
 
-const emit = defineEmits(['choose-folder', 'generated', 'draft', 'restored', 'other-shape'])
+const emit = defineEmits(['choose-folder', 'generated', 'draft', 'restored', 'choose'])
 
 const SONG_MOMENTS = new Set(MOMENTS.map((moment) => moment.id))
 const INTERVALS = new Set(['vazio', 'imagem', 'texto', 'texto+imagem'])
@@ -930,13 +932,24 @@ function syncHead() {
   if (!title || !catalog || !facts.length) {
     return
   }
+  const dayInput = title.querySelector('input')
+  const dateInput = dateFact.value?.querySelector('input')
+  const locked = p > 0.92
+  if (dayInput) dayInput.readOnly = locked
+  if (dateInput) dateInput.readOnly = locked
   const lift = head.dataset.lift !== '0'
   catalog.style.marginTop = `${0.45 * (1 - (lift ? p : 0))}rem`
   catalog.style.marginBottom = lift ? `${-p * catalog.offsetHeight}px` : ''
-  const titleBox = title.getBoundingClientRect()
+  const name = title.querySelector('input')
+  const nameBox = name?.getBoundingClientRect() || title.getBoundingClientRect()
+  const toggleBox = title.querySelector('.day-toggle')?.getBoundingClientRect()
+  const anchorRight = Math.max(nameBox.right, toggleBox?.width ? toggleBox.right : nameBox.right)
   const headBox = head.getBoundingClientRect()
-  const titleMid = titleBox.top + titleBox.height / 2
-  let x = titleBox.right + 14
+  const shapeBox = head.querySelector('.shape-switch')?.getBoundingClientRect()
+  const shapeBlocks = shapeBox && shapeBox.width > 0 && shapeBox.top < nameBox.bottom && shapeBox.bottom > nameBox.top
+  const limit = (shapeBlocks ? shapeBox.left : headBox.right) - 8
+  const titleMid = nameBox.top + nameBox.height / 2
+  let x = anchorRight + 14
   const moves = []
   for (const el of facts) {
     const matrix = new DOMMatrix(getComputedStyle(el).transform)
@@ -949,7 +962,7 @@ function syncHead() {
     })
     x += box.width + 12
   }
-  const fits = x <= headBox.right - 4
+  const fits = x <= limit
   head.dataset.lift = fits ? '1' : '0'
   if (fits !== lift) {
     catalog.style.marginTop = `${0.45 * (1 - (fits ? p : 0))}rem`
@@ -1213,6 +1226,7 @@ async function generate(replace = false) {
   <div class="deck">
     <header ref="massHead" class="mass-head">
       <div class="specimen">
+        <div class="day-row">
         <div ref="daySearch" class="day-search" :class="{ open: dayOpen, spanning: daySpanning }">
           <h1>
             <input
@@ -1264,6 +1278,8 @@ async function generate(replace = false) {
             </li>
           </ul>
           </Transition>
+        </div>
+        <ShapeLine :shape="shape" group="missa-shape" @choose="emit('choose', $event)" />
         </div>
         <p ref="catalogLine" class="catalog">
           <span v-if="seasonLabel" ref="seasonFact" class="catalog-season">{{ seasonLabel }}</span>
@@ -1338,7 +1354,6 @@ async function generate(replace = false) {
         </button>
       </div>
       <p v-if="intervalMissing" class="open-names">{{ intervalMissing }}</p>
-      <p class="shape-swap"><button type="button" @click="emit('other-shape')">Usar lista de cânticos</button></p>
       <p v-if="error" class="status error">{{ error }}</p>
     </section>
 
@@ -1414,7 +1429,7 @@ async function generate(replace = false) {
     </div>
 
     <section class="panel deck-choices">
-      <h2>Credo, oração e intervalo</h2>
+      <h2>Credo, oração e intervalo entre cânticos</h2>
       <div class="choice-grid">
         <div class="deck-field">
           <span id="credo-label">Credo</span>

@@ -1,17 +1,173 @@
 <script setup>
-import { ref } from 'vue'
+import { nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import Estrofes from './Estrofes.vue'
 import SongShow from './SongShow.vue'
+import { songControlName } from '../songs.js'
 
-defineProps({
+const props = defineProps({
   songs: { type: Array, required: true },
 })
 
 const emit = defineEmits(['remove', 'up', 'down', 'clear', 'show'])
 const estrofesOpen = ref(null)
+const list = ref(null)
+const stage = ref(null)
+const emptyEl = ref(null)
+const displaySongs = ref(props.songs)
+const holdEmpty = ref(false)
+const emptyEntering = ref(false)
+const live = new Set()
+let flight = 0
+
+const ease = 'cubic-bezier(0.16, 1, 0.3, 1)'
+
+watch(() => props.songs, (songs, previous) => {
+  const before = previous?.length ?? 0
+  const after = songs.length
+  if (before === after) {
+    if (holdEmpty.value || emptyEntering.value) return
+    displaySongs.value = songs
+    return
+  }
+  cancelLive()
+  const token = ++flight
+  if (before === 0 && after > 0) {
+    lockStage()
+    displaySongs.value = songs
+    emptyEntering.value = false
+    holdEmpty.value = true
+    settleArrival(token)
+    return
+  }
+  if (before === 1 && after === 0) {
+    unlockStage()
+    holdEmpty.value = false
+    emptyEntering.value = true
+    settleDepart(token)
+    return
+  }
+  holdEmpty.value = false
+  emptyEntering.value = false
+  unlockStage()
+  displaySongs.value = songs
+  if (after > before) scrollChosen()
+}, { flush: 'pre' })
+
+onBeforeUnmount(() => {
+  flight += 1
+  cancelLive()
+  unlockStage()
+})
 
 function showEstrofes(id) {
   estrofesOpen.value = estrofesOpen.value === id ? null : id
+}
+
+function prefersReduced() {
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches
+}
+
+function lockStage() {
+  const el = stage.value
+  if (!el) return
+  el.style.height = `${el.getBoundingClientRect().height}px`
+}
+
+function unlockStage() {
+  if (stage.value) stage.value.style.height = ''
+}
+
+function track(animation) {
+  live.add(animation)
+  return animation
+}
+
+function cancelLive() {
+  for (const animation of live) animation.cancel()
+  live.clear()
+}
+
+async function scrollChosen() {
+  await nextTick()
+  const el = list.value
+  if (!el || el.scrollHeight <= el.clientHeight) return
+  el.scrollTop = el.scrollHeight - el.clientHeight
+}
+
+async function settleArrival(token) {
+  try {
+    await nextTick()
+    if (token !== flight) return
+    await runArrival()
+  } catch {
+    // A newer change cancelled this flight.
+  } finally {
+    if (token !== flight) return
+    holdEmpty.value = false
+    await nextTick()
+    if (token !== flight) return
+    cancelLive()
+    unlockStage()
+    clearWillChange()
+  }
+}
+
+async function settleDepart(token) {
+  try {
+    await nextTick()
+    if (token !== flight) return
+    await runDepart()
+  } catch {
+    // A newer change cancelled this flight.
+  } finally {
+    if (token !== flight) return
+    displaySongs.value = []
+    emptyEntering.value = false
+    await nextTick()
+    if (token !== flight) return
+    cancelLive()
+    clearWillChange()
+  }
+}
+
+function clearWillChange() {
+  const song = list.value?.querySelector('.chosen-song')
+  if (song) song.style.willChange = ''
+  if (emptyEl.value) emptyEl.value.style.willChange = ''
+}
+
+function fadePair(empty, song, direction) {
+  const reduced = prefersReduced()
+  const duration = reduced ? 160 : 240
+  empty.style.willChange = reduced ? 'opacity' : 'opacity, filter'
+  song.style.willChange = 'opacity'
+  const emptyFrames = reduced
+    ? [{ opacity: direction === 'in' ? 0 : 1 }, { opacity: direction === 'in' ? 1 : 0 }]
+    : [
+        { opacity: direction === 'in' ? 0 : 1, filter: direction === 'in' ? 'blur(2px)' : 'blur(0px)' },
+        { opacity: direction === 'in' ? 1 : 0, filter: direction === 'in' ? 'blur(0px)' : 'blur(2px)' },
+      ]
+  return Promise.all([
+    track(empty.animate(emptyFrames, { duration, easing: ease, fill: 'forwards' })).finished,
+    track(song.animate(
+      [{ opacity: direction === 'in' ? 1 : 0 }, { opacity: direction === 'in' ? 0 : 1 }],
+      { duration, easing: ease, fill: 'both' },
+    )).finished,
+  ])
+}
+
+async function runArrival() {
+  const empty = emptyEl.value
+  const song = list.value?.querySelector('.chosen-song')
+  if (!empty || !song) return
+  await fadePair(empty, song, 'out')
+}
+
+async function runDepart() {
+  const empty = emptyEl.value
+  const song = list.value?.querySelector('.chosen-song')
+  if (!empty || !song) return
+  await fadePair(empty, song, 'in')
 }
 </script>
 
@@ -19,16 +175,45 @@ function showEstrofes(id) {
   <section class="panel">
     <div class="panel-head">
       <h2>Cânticos escolhidos</h2>
-      <button type="button" class="clear" :disabled="songs.length === 0" @click="emit('clear')">
+      <button type="button" class="clear" :disabled="displaySongs.length === 0" @click="emit('clear')">
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <path d="M4 6h9M4 12h9M4 18h6M16 15l4 4M20 15l-4 4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
         </svg>
         Limpar
       </button>
     </div>
-    <p v-if="songs.length === 0" class="missing">Ainda não há cânticos.</p>
-    <ul class="songs">
-      <li v-for="(song, index) in songs" :key="`${song.id}-${index}`" class="chosen-song">
+    <div ref="stage" class="chosen-stage">
+    <div
+      v-if="displaySongs.length === 0 || holdEmpty || emptyEntering"
+      ref="emptyEl"
+      class="empty-chosen"
+      :class="{ departing: holdEmpty, entering: emptyEntering }"
+      :aria-hidden="holdEmpty ? 'true' : undefined"
+    >
+      <div class="song-scaffold" aria-hidden="true">
+        <div v-for="n in 3" :key="n" class="scaffold-row">
+          <span class="scaffold-badge"></span>
+          <span class="scaffold-title"></span>
+          <span class="scaffold-actions"></span>
+        </div>
+      </div>
+      <p>Ainda não há cânticos.</p>
+      <div class="song-scaffold" aria-hidden="true">
+        <div v-for="n in 3" :key="n" class="scaffold-row">
+          <span class="scaffold-badge"></span>
+          <span class="scaffold-title"></span>
+          <span class="scaffold-actions"></span>
+        </div>
+      </div>
+    </div>
+    <ul
+      v-if="displaySongs.length"
+      ref="list"
+      class="songs"
+      :class="{ arriving: holdEmpty, 'songs-departing': emptyEntering }"
+      :aria-hidden="emptyEntering ? 'true' : undefined"
+    >
+      <li v-for="(song, index) in displaySongs" :key="`${song.id}-${index}`" class="chosen-song">
         <div class="chosen-body">
           <span class="song-label">
             <span class="book-badge">{{ song.bookId || '#' }}</span>
@@ -49,17 +234,17 @@ function showEstrofes(id) {
           </span>
         </div>
         <span class="row-actions">
-          <button type="button" class="icon" aria-label="Subir" :disabled="index === 0" @click="emit('up', index)">
+          <button type="button" class="icon" :aria-label="songControlName('Subir', song)" :title="songControlName('Subir', song)" :disabled="index === 0" @click="emit('up', index)">
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="M12 19V5M6 11l6-6 6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
             </svg>
           </button>
-          <button type="button" class="icon" aria-label="Descer" :disabled="index === songs.length - 1" @click="emit('down', index)">
+          <button type="button" class="icon" :aria-label="songControlName('Descer', song)" :title="songControlName('Descer', song)" :disabled="index === displaySongs.length - 1" @click="emit('down', index)">
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="M12 5v14M6 13l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
             </svg>
           </button>
-          <button type="button" class="icon row-remove" aria-label="Retirar" @click="emit('remove', index)">
+          <button type="button" class="icon row-remove" :aria-label="songControlName('Retirar', song)" :title="songControlName('Retirar', song)" @click="emit('remove', index)">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
               <path d="M6 6l12 12M18 6 6 18" />
             </svg>
@@ -67,5 +252,6 @@ function showEstrofes(id) {
         </span>
       </li>
     </ul>
+    </div>
   </section>
 </template>

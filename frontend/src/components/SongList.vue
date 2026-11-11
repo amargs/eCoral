@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import { vClipTitle } from '../clipTitle.js'
-import { byBookId, matches } from '../songs.js'
+import { byBookId, matches, songControlName } from '../songs.js'
 
 const props = defineProps({
   songs: { type: Array, required: true },
@@ -20,6 +20,10 @@ function picked(song) {
 
 function unavailable(song) {
   return !song.hasVerses || (props.requireBookId && !song.bookId)
+}
+
+function controlName(song) {
+  return songControlName(picked(song) ? 'Retirar' : props.actionLabel, song)
 }
 
 function toggle(song) {
@@ -61,8 +65,8 @@ const visible = computed(() =>
           type="button"
           class="icon song-toggle"
           :class="{ chosen: picked(song) }"
-          :aria-label="picked(song) ? 'Retirar' : actionLabel"
-          :title="picked(song) ? 'Retirar' : actionLabel"
+          :aria-label="controlName(song)"
+          :title="controlName(song)"
           :disabled="unavailable(song)"
           @click.stop="toggle(song)"
         >

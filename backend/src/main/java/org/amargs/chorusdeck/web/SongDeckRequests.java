@@ -148,12 +148,12 @@ public final class SongDeckRequests {
     }
 
     private static Cover other(JsonNode node) {
-        String layout = required(node, "layout", "An other cover requires layout, domingo, and header.");
+        String layout = required(node, "layout", "An other cover requires a layout.");
         if (!Season.coverLayouts().contains(layout)) {
             throw new IllegalArgumentException("Unknown cover: " + layout);
         }
-        String domingo = required(node, "domingo", "An other cover requires layout, domingo, and header.");
-        String header = required(node, "header", "An other cover requires layout, domingo, and header.");
+        String domingo = optional(node, "domingo");
+        String header = optional(node, "header");
         String frase = optional(node, "frase");
         String versiculo = optional(node, "versiculo");
         Season.resolve("comum", layout);

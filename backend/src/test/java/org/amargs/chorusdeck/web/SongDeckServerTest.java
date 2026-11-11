@@ -255,6 +255,11 @@ class SongDeckServerTest {
                 "Sl 1",
                 null,
                 "Ensaio do coro"), ready.cover());
+        JsonNode themeOnly = JSON.readTree("""
+                {"ids":[1],"output":"a.pptx","cover":{"kind":"outro","layout":"Capa - Advento"}}
+                """);
+        assertEquals("", SongDeckRequests.parse(themeOnly, songs, dir).cover().domingo());
+        assertEquals("", SongDeckRequests.parse(themeOnly, songs, dir).cover().header());
         JsonNode unknown = JSON.readTree("""
                 {"ids":[1],"output":"a.pptx","cover":{"kind":"outro","layout":"Capa inventada","domingo":"Ensaio","header":"Linha","frase":"A","versiculo":"Sl 1"}}
                 """);

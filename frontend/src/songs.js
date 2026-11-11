@@ -38,6 +38,14 @@ export function deckFileName(domingo, season, ano) {
   return `${label} - Ano ${year}.pptx`.replace(/[\\/:*?"<>|]/g, '')
 }
 
+export function songControlName(action, song) {
+  const text = (value) => typeof value === 'string' ? value.trim() : ''
+  const title = text(song?.title)
+  const alt = text(song?.titleAlt)
+  const name = title && alt ? `${title} (${alt})` : (title || alt)
+  return [action, text(song?.bookId), name].filter(Boolean).join(' ')
+}
+
 export const MOMENTS = [
   { id: 'entrada', label: 'Entrada' },
   { id: 'kyrie', label: 'Kyrie' },

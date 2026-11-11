@@ -567,6 +567,9 @@ public final class DeckService {
         if (cover.header() != null && !cover.header().isBlank()) {
             return cover.header().trim();
         }
+        if (cover.ano() == null) {
+            return "";
+        }
         return season.tempo(cover.ano());
     }
 

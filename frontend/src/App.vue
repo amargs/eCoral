@@ -2,10 +2,11 @@
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import ChosenSongs from './components/ChosenSongs.vue'
 import CoverFields from './components/CoverFields.vue'
+import ShapeLine from './components/ShapeLine.vue'
 import Eucharist from './components/Eucharist.vue'
 import Library from './components/Library.vue'
 import SongList from './components/SongList.vue'
-import { deckFileName, keepEstrofes, occasionFileName, slideChoice, withShow } from './songs.js'
+import { keepEstrofes, occasionFileName, slideChoice, withShow } from './songs.js'
 
 const screen = ref('home')
 const shape = ref('missa')
@@ -24,7 +25,7 @@ const chosen = ref([])
 const query = ref('')
 const coverOn = ref(false)
 const cover = reactive({
-  kind: 'celebracao',
+  kind: 'outro',
   season: 'comum',
   ano: 'A',
   domingo: '',
@@ -63,19 +64,23 @@ const syncChoice = ref('local')
 const draftFolder = ref('')
 const libraryReady = ref(false)
 
-const coverReady = computed(() => {
-  const text = (value) => value && value.trim()
-  if (!text(cover.domingo)) {
-    return false
+const coverReady = computed(() => Boolean(cover.layout))
+
+const generateReason = computed(() => {
+  const reasons = []
+  if (chosen.value.length === 0) {
+    reasons.push('Escolha pelo menos um cântico.')
   }
-  if (cover.kind === 'outro') {
-    return cover.layout && text(cover.header)
+  if (!output.value.trim()) {
+    reasons.push('Indique o nome do ficheiro.')
   }
-  return cover.season && cover.ano
+  if (coverOn.value && !coverReady.value) {
+    reasons.push('Escolha o tema da capa.')
+  }
+  return reasons.join(' ')
 })
 
-const canGenerate = computed(() =>
-  chosen.value.length > 0 && output.value.trim() && (!coverOn.value || coverReady.value))
+const canGenerate = computed(() => !generateReason.value)
 
 const chosenIds = computed(() => chosen.value.map((song) => song.id))
 
@@ -106,17 +111,13 @@ watch(draftPrompt, (open) => {
   }
 })
 
-watch([coverOn, () => cover.kind, () => cover.season, () => cover.ano, () => cover.domingo], () => {
+watch([coverOn, () => cover.domingo], () => {
   if (outputEdited.value) {
     return
   }
-  if (!coverOn.value || !cover.domingo.trim()) {
-    output.value = 'cânticos.pptx'
-    return
-  }
-  output.value = cover.kind === 'outro'
+  output.value = coverOn.value && cover.domingo.trim()
     ? occasionFileName(cover.domingo)
-    : deckFileName(cover.domingo, cover.season, cover.ano)
+    : 'cânticos.pptx'
 })
 
 function dismissSaved() {
@@ -705,24 +706,13 @@ async function generate(replace = false) {
     body.replace = true
   }
   if (coverOn.value) {
-    if (cover.kind === 'outro') {
-      body.cover = {
-        kind: 'outro',
-        layout: cover.layout,
-        domingo: cover.domingo.trim(),
-        header: cover.header.trim(),
-        frase: cover.frase.trim(),
-        versiculo: cover.versiculo.trim(),
-      }
-    } else {
-      body.cover = {
-        kind: 'celebracao',
-        season: cover.season,
-        ano: cover.ano,
-        domingo: cover.domingo.trim(),
-        frase: cover.frase.trim(),
-        versiculo: cover.versiculo.trim(),
-      }
+    body.cover = {
+      kind: 'outro',
+      layout: cover.layout,
+      domingo: cover.domingo.trim(),
+      header: cover.header.trim(),
+      frase: cover.frase.trim(),
+      versiculo: cover.versiculo.trim(),
     }
   }
   try {
@@ -932,13 +922,18 @@ async function errorText(response) {
       :songs="library"
       :folder="folder"
       :draft="eucharistDraft"
+      :shape="shape"
+      @choose="chooseShape"
       @choose-folder="chooseFolder"
       @generated="savedPath = $event"
-      @other-shape="chooseShape('lista')"
       @draft="onEucharistDraft"
       @restored="onEucharistRestored"
     />
     <div v-if="songsMounted" v-show="shape === 'lista'" class="deck">
+      <header class="deck-head">
+        <h1>Lista de cânticos</h1>
+        <ShapeLine :shape="shape" group="lista-shape" @choose="chooseShape" />
+      </header>
       <p v-if="loadError" class="status error">{{ loadError }}</p>
       <section v-else class="panel export">
         <div class="export-fields">
@@ -963,18 +958,24 @@ async function errorText(response) {
               </button>
             </div>
           </div>
-          <button class="primary" type="button" :disabled="!canGenerate || busy" @click="generate">
-            <span v-if="busy" class="spinner" aria-hidden="true"></span>
-          {{ busy ? 'A gerar…' : 'Gerar' }}
-        </button>
+          <div class="generate">
+            <span class="generate-hit" :class="{ blocked: generateReason }">
+              <button class="primary" type="button" :disabled="!canGenerate || busy" :aria-describedby="generateReason ? 'lista-generate-reason' : undefined" @click="generate">
+                <span v-if="busy" class="spinner" aria-hidden="true"></span>
+                {{ busy ? 'A gerar…' : 'Gerar' }}
+              </button>
+              <p v-if="generateReason" id="lista-generate-reason" class="generate-hint" role="tooltip">{{ generateReason }}</p>
+            </span>
+          </div>
         </div>
         <p v-if="folder" class="path-full">{{ folder }}</p>
-        <p class="shape-swap"><button type="button" @click="chooseShape('missa')">Usar a missa</button></p>
         <p v-if="error && !savedPath" class="status error">{{ error }}</p>
       </section>
-      <div v-if="!loadError" class="columns">
+      <div v-if="!loadError" class="columns list-columns">
+        <ChosenSongs :songs="chosen" @remove="remove" @up="move($event, -1)" @down="move($event, 1)" @clear="clearChosen" @show="showSong" />
         <SongList
-          heading="Procurar"
+          class="song-rail"
+          heading="Pesquisar"
           :songs="library"
           :query="query"
           :chosen-ids="chosenIds"
@@ -982,7 +983,6 @@ async function errorText(response) {
           @add="add"
           @remove-song="removeSong"
         />
-        <ChosenSongs :songs="chosen" @remove="remove" @up="move($event, -1)" @down="move($event, 1)" @clear="clearChosen" @show="showSong" />
       </div>
       <CoverFields v-if="!loadError" v-model:enabled="coverOn" :cover="cover" />
     </div>
