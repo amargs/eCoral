@@ -16,10 +16,12 @@ const emptyEl = ref(null)
 const displaySongs = ref(props.songs)
 const holdEmpty = ref(false)
 const emptyEntering = ref(false)
+const arrivingIds = ref([])
 const live = new Set()
 const rowMoves = new Set()
 let flight = 0
 let moveToken = 0
+let scrollToken = 0
 
 const ease = 'cubic-bezier(0.16, 1, 0.3, 1)'
 
@@ -34,8 +36,8 @@ watch(() => props.songs, (songs, previous) => {
     if (beforeTops) slideRows(beforeTops)
     return
   }
+  releaseArrivals()
   cancelRowMoves()
-  cancelLive()
   const token = ++flight
   if (before === 0 && after > 0) {
     lockStage()
@@ -55,8 +57,13 @@ watch(() => props.songs, (songs, previous) => {
   holdEmpty.value = false
   emptyEntering.value = false
   unlockStage()
+  if (after > before) {
+    arrivingIds.value = songs.filter((song) => !previous.some((item) => item.id === song.id)).map((song) => song.id)
+    displaySongs.value = songs
+    settleAppend(token)
+    return
+  }
   displaySongs.value = songs
-  if (after > before) scrollChosen()
 }, { flush: 'pre' })
 
 onBeforeUnmount(() => {
@@ -149,6 +156,99 @@ function cancelLive() {
   live.clear()
 }
 
+function releaseArrivals() {
+  for (const row of list.value?.querySelectorAll('.chosen-song.is-arriving') ?? []) {
+    row.classList.remove('is-arriving')
+  }
+  arrivingIds.value = []
+  cancelLive()
+}
+
+async function settleAppend(token) {
+  try {
+    await nextTick()
+    if (token !== flight) return
+    await fadeArrivals()
+  } catch {
+    // A newer change cancelled this flight.
+  } finally {
+    if (token !== flight) return
+    arrivingIds.value = []
+    await nextTick()
+    if (token !== flight) return
+    cancelLive()
+    clearWillChange()
+  }
+}
+
+async function fadeArrivals() {
+  const rows = [...(list.value?.querySelectorAll('.chosen-song.is-arriving') ?? [])]
+  if (!rows.length) return
+  const reduced = prefersReduced()
+  const duration = reduced ? 160 : 240
+  const fades = rows.map((row) => {
+    row.style.willChange = 'opacity'
+    return track(row.animate(
+      [{ opacity: 0 }, { opacity: 1 }],
+      { duration, easing: ease, fill: 'both' },
+    )).finished
+  })
+  await Promise.all([...fades, easeScroll(duration, reduced)])
+}
+
+function easeScroll(duration, reduced) {
+  const el = list.value
+  if (!el) return Promise.resolve()
+  const token = ++scrollToken
+  const target = el.scrollHeight - el.clientHeight
+  const from = el.scrollTop
+  if (target <= from + 1) return Promise.resolve()
+  if (reduced) {
+    el.scrollTop = target
+    return Promise.resolve()
+  }
+  const curve = fadeEase()
+  const start = performance.now()
+  return new Promise((resolve) => {
+    function frame(now) {
+      if (!list.value || token !== scrollToken) {
+        resolve()
+        return
+      }
+      const t = Math.min(1, (now - start) / duration)
+      el.scrollTop = from + (target - from) * curve(t)
+      if (t < 1) requestAnimationFrame(frame)
+      else resolve()
+    }
+    requestAnimationFrame(frame)
+  })
+}
+
+function fadeEase() {
+  const x1 = 0.16
+  const y1 = 1
+  const x2 = 0.3
+  const y2 = 1
+  const cx = 3 * x1
+  const bx = 3 * (x2 - x1) - cx
+  const ax = 1 - cx - bx
+  const cy = 3 * y1
+  const by = 3 * (y2 - y1) - cy
+  const ay = 1 - cy - by
+  const sampleX = (t) => ((ax * t + bx) * t + cx) * t
+  const sampleY = (t) => ((ay * t + by) * t + cy) * t
+  const sampleDX = (t) => (3 * ax * t + 2 * bx) * t + cx
+  return (x) => {
+    let t = x
+    for (let i = 0; i < 6; i += 1) {
+      const slope = sampleDX(t)
+      if (Math.abs(slope) < 1e-4) break
+      t -= (sampleX(t) - x) / slope
+    }
+    return sampleY(Math.min(1, Math.max(0, t)))
+  }
+}
+
 async function scrollChosen() {
   await nextTick()
   const el = list.value
@@ -194,8 +294,9 @@ async function settleDepart(token) {
 
 function clearWillChange() {
   if (list.value) list.value.style.willChange = ''
-  const song = list.value?.querySelector('.chosen-song')
-  if (song) song.style.willChange = ''
+  for (const row of list.value?.querySelectorAll('.chosen-song') ?? []) {
+    row.style.willChange = ''
+  }
   if (emptyEl.value) emptyEl.value.style.willChange = ''
 }
 
@@ -276,7 +377,7 @@ async function runDepart() {
       :class="{ arriving: holdEmpty, 'songs-departing': emptyEntering }"
       :aria-hidden="emptyEntering ? 'true' : undefined"
     >
-      <li v-for="(song, index) in displaySongs" :key="song.id" :data-id="song.id" class="chosen-song">
+      <li v-for="(song, index) in displaySongs" :key="song.id" :data-id="song.id" class="chosen-song" :class="{ 'is-arriving': arrivingIds.includes(song.id) }">
         <div class="chosen-body">
           <span class="song-label">
             <span class="book-badge">{{ song.bookId || '#' }}</span>

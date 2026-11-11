@@ -1535,6 +1535,10 @@ button.choice-token[aria-expanded="true"] {
   background: #fff;
 }
 
+.chosen-song.is-arriving {
+  opacity: 0;
+}
+
 .estrofes {
   order: 1;
   flex: 1 0 100%;
