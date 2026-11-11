@@ -1,13 +1,15 @@
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import VerseBox from './VerseBox.vue'
-import { LANGUAGES, languageName } from '../songs.js'
+import { LANGUAGES, SEASONS, languageName } from '../songs.js'
 
 const props = defineProps({
   modelValue: { type: Array, required: true },
   alt: { type: Array, default: null },
   lang: { type: String, default: 'pt' },
   langAlt: { type: String, default: 'la' },
+  marks: { type: String, default: '' },
+  sundays: { type: Array, default: () => [] },
 })
 
 const emit = defineEmits(['update:modelValue', 'update:alt', 'update:lang', 'update:langAlt'])
@@ -40,13 +42,14 @@ function nextKey(list) {
   return list.reduce((n, item) => Math.max(n, Number(item.key) || 0), 0) + 1
 }
 
-function blank(list) {
-  return { key: nextKey(list), markup: '' }
+function blank(list, mark = '') {
+  return { key: nextKey(list), markup: '', mark }
 }
 
 function insertVerse(index) {
+  const mark = index >= 0 ? props.modelValue[index]?.mark : props.modelValue[0]?.mark
   const verses = props.modelValue.slice()
-  verses.splice(index + 1, 0, blank(props.modelValue))
+  verses.splice(index + 1, 0, blank(props.modelValue, mark || ''))
   let alt = null
   if (paired.value) {
     alt = props.alt.slice()
@@ -60,7 +63,7 @@ function insertVerse(index) {
 
 function duplicateVerse(index) {
   const verses = props.modelValue.slice()
-  const created = blank(props.modelValue)
+  const created = blank(props.modelValue, props.modelValue[index]?.mark || '')
   created.markup = props.modelValue[index].markup
   verses.splice(index + 1, 0, created)
   let alt = null
@@ -201,6 +204,12 @@ function syncFormatState() {
   underlineOn.value = document.queryCommandState('underline')
 }
 
+function setMark(index, value) {
+  const verses = props.modelValue.slice()
+  verses[index] = { ...verses[index], mark: value }
+  emit('update:modelValue', verses)
+}
+
 function chooseLang(event) {
   const code = event.target.value
   if (code === props.langAlt) emit('update:langAlt', props.lang)
@@ -320,6 +329,23 @@ onUnmounted(() => {
             @focus="onVerseFocus(fieldId(column.id, column.items[index]), $event)"
           />
         </div>
+        <label v-if="marks" class="verse-mark">
+          <span>{{ marks === 'sunday' ? 'Domingo' : 'Tempo' }}</span>
+          <select
+            :value="item.mark"
+            :aria-label="(marks === 'sunday' ? 'Domingo da caixa ' : 'Tempo da caixa ') + (index + 1)"
+            @change="setMark(index, $event.target.value)"
+          >
+            <template v-if="marks === 'tempo'">
+              <option v-for="season in SEASONS" :key="season.id" :value="season.id">{{ season.label }}</option>
+            </template>
+            <template v-else>
+              <option v-for="day in sundays" :key="day.key" :value="day.key">
+                {{ day.name }}<template v-if="day.ano"> · Ano {{ day.ano }}</template>
+              </option>
+            </template>
+          </select>
+        </label>
         <div class="verse-actions">
           <button type="button" class="icon" aria-label="Duplicar estrofe" @click="duplicateVerse(index)">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">

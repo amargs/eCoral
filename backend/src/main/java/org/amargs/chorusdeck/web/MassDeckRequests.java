@@ -7,6 +7,8 @@ import org.amargs.chorusdeck.deck.DeckSpec;
 import org.amargs.chorusdeck.deck.MassRequest;
 import org.amargs.chorusdeck.deck.Season;
 import org.amargs.chorusdeck.deck.SlideChoice;
+import org.amargs.chorusdeck.deck.VerseContext;
+import org.amargs.chorusdeck.liturgy.LiturgicalCalendar;
 import org.amargs.chorusdeck.index.SongCfg;
 import org.amargs.chorusdeck.liturgy.LiturgyClient;
 import org.amargs.chorusdeck.liturgy.LiturgyDay;
@@ -55,6 +57,10 @@ public final class MassDeckRequests {
         body.put("date", day.date().toString());
         body.put("domingo", text(day.domingo()));
         body.put("season", day.seasonKey());
+        String sunday = LiturgicalCalendar.sundayKey(day.date());
+        if (sunday != null) {
+            body.put("sunday", sunday);
+        }
         body.put("ano", text(day.ano()));
         body.put("frase", text(day.evangelho() == null ? null : day.evangelho().citacao()));
         body.put("versiculo", text(day.evangelho() == null ? null : day.evangelho().referencia()));
@@ -158,6 +164,7 @@ public final class MassDeckRequests {
             throw new IllegalArgumentException("The generate request must be an object.");
         }
         LocalDate date = date(text(body, "date"));
+        VerseContext verses = VerseContext.forDate(date);
         JsonNode moments = body.get("songs");
         ObjectNode normalized = JSON.createObjectNode();
         Map<String, SlideChoice> choices = new LinkedHashMap<>();
@@ -186,7 +193,7 @@ public final class MassDeckRequests {
                 if (bookId.isEmpty()) {
                     return;
                 }
-                checkBook(songs, bookId, choice);
+                checkBook(songs, bookId, choice, verses);
                 normalized.put(entry.getKey(), bookId);
                 if (choice != null) {
                     choices.put(entry.getKey(), choice);
@@ -216,7 +223,7 @@ public final class MassDeckRequests {
                 choices);
     }
 
-    private static void checkBook(List<SongCfg> songs, String bookId, SlideChoice choice) {
+    private static void checkBook(List<SongCfg> songs, String bookId, SlideChoice choice, VerseContext verses) {
         SongCfg found = null;
         for (SongCfg song : songs) {
             if (!bookId.equals(song.bookId())) {
@@ -230,14 +237,10 @@ public final class MassDeckRequests {
         if (found == null) {
             throw new IllegalArgumentException("Unknown songbook id: " + bookId);
         }
-        if (choice == null) {
-            SongCfg shown = found.prepared();
-            if (shown.content() == null || shown.content().isEmpty()) {
-                throw new IllegalArgumentException("Song " + found.id() + " has no verses.");
-            }
-            return;
+        SongCfg shown = SlideChoice.resolve(found, choice, verses);
+        if (shown != null && (shown.content() == null || shown.content().isEmpty())) {
+            throw new IllegalArgumentException("Song " + found.id() + " has no verses.");
         }
-        choice.show(found);
     }
 
     private static void copyGroup(JsonNode body, ObjectNode request, String name) {

@@ -71,6 +71,31 @@ public final class LiturgicalCalendar {
         return List.copyOf(days);
     }
 
+    /**
+     * The lectionary id of {@code date}. A Sunday that shares its date with a fixed solemnity
+     * keeps the Sunday, year included ({@code lent-3/B}). A day that is only a solemnity keeps that id.
+     */
+    public static String sundayKey(LocalDate date) {
+        if (date == null) {
+            return null;
+        }
+        String sunday = null;
+        String fixed = null;
+        for (Celebration day : yearOf(date)) {
+            if (!date.equals(day.date())) {
+                continue;
+            }
+            if (day.ano() != null && !day.ano().isBlank()) {
+                if (sunday == null) {
+                    sunday = day.key();
+                }
+            } else if (fixed == null) {
+                fixed = day.key();
+            }
+        }
+        return sunday != null ? sunday : fixed;
+    }
+
     /** The civil year that names the liturgical year: 2026 is A, and Advent 2026 begins 2027. */
     static int missalYear(LocalDate date) {
         int year = date.getYear();

@@ -194,6 +194,35 @@ class SongIndexTest {
     }
 
     @Test
+    void reindexKeepsTheTextBoxTempoWhenTheVersesStillLineUp() throws Exception {
+        SongCfg previous = new SongCfg(
+                5,
+                "Aleluia Glória ao Senhor",
+                List.of("páscoa", "natal"),
+                "A5",
+                null,
+                null,
+                null,
+                null,
+                null,
+                List.of("pascoa", "natal"),
+                null);
+        SongCfg kept = SongIds.assign(List.of(new SongCfg(1, "Aleluia Glória ao Senhor", List.of("nova páscoa", "novo natal"))), List.of(previous))
+                .songs().get(0);
+        assertEquals(5, kept.id());
+        assertEquals("A5", kept.bookId());
+        assertEquals(List.of("pascoa", "natal"), kept.verseSeasons());
+        assertNull(kept.verseSundays());
+
+        ObjectMapper mapper = new ObjectMapper();
+        String json = mapper.writeValueAsString(List.of(previous));
+        assertTrue(json.contains("\"verseSeasons\":[\"pascoa\",\"natal\"]"));
+        assertFalse(json.contains("verseSundays"));
+        assertEquals(List.of(previous), mapper.readValue(json, new TypeReference<List<SongCfg>>() {}));
+        assertFalse(mapper.writeValueAsString(List.of(new SongCfg(1, "A", List.of("v")))).contains("verseSeasons"));
+    }
+
+    @Test
     void dropsBoldWhenTheOnlySlideIsFullyBold() {
         SongCfg single = new SongCfg(8, "Song", new ArrayList<>(List.of("**tudo em negrito**")));
         SongCfg multi = new SongCfg(6, "Song", new ArrayList<>(List.of("**refrão**", "verso")));

@@ -323,7 +323,9 @@ function showSong(index, patch) {
   const song = chosen.value[index]
   if (!song) return
   const next = { ...song, ...patch }
-  if (patch.showLyrics && patch.showLyrics !== song.showLyrics) {
+  if ((patch.showLyrics && patch.showLyrics !== song.showLyrics)
+      || Object.prototype.hasOwnProperty.call(patch, 'showTempo')
+      || Object.prototype.hasOwnProperty.call(patch, 'showSunday')) {
     next.showEstrofes = keepEstrofes(next, song.showEstrofes)
   }
   const copy = chosen.value.slice()
@@ -695,7 +697,7 @@ async function generate(replace = false) {
   busy.value = true
   const body = {
     ids: chosen.value.map((song) => {
-      const choice = slideChoice(song)
+      const choice = slideChoice(song, { sendTempo: true })
       return Object.keys(choice).length ? { id: song.id, ...choice } : song.id
     }),
     output: output.value.trim(),

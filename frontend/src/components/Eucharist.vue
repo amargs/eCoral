@@ -4,6 +4,7 @@ import SongList from './SongList.vue'
 import { ACCENTS, COVERS, MOMENTS, SEASONS, comingSunday, keepEstrofes, preferredLyrics, rememberedChoice, slideChoice, withShow } from '../songs.js'
 import Estrofes from './Estrofes.vue'
 import SongShow from './SongShow.vue'
+import VerseTempo from './VerseTempo.vue'
 import ShapeLine from './ShapeLine.vue'
 import FontNotice from './FontNotice.vue'
 
@@ -240,11 +241,24 @@ const openCount = computed(() =>
 const openMoments = computed(() =>
   rows.value.filter((moment) => !moment.fixed && !moment.optional && !slots[moment.id]))
 
-const songNotices = computed(() => {
-  if (!openMoments.value.length) {
-    return []
+const liturgyMissing = computed(() => {
+  const day = liturgy.value
+  if (!day) {
+    return false
   }
-  return [{ key: 'empty', text: 'Há momentos sem cântico.', moment: openMoments.value[0].id }]
+  const source = useSolemnity.value && day.solemnity?.outranks ? day.solemnity : day
+  return !hasStoredSentences(source)
+})
+
+const songNotices = computed(() => {
+  const notices = []
+  if (liturgyMissing.value) {
+    notices.push({ key: 'liturgy', text: 'Não há liturgia para este dia.', readings: true })
+  }
+  if (openMoments.value.length) {
+    notices.push({ key: 'empty', text: 'Há momentos sem cântico.', moment: openMoments.value[0].id })
+  }
+  return notices
 })
 
 const armedMoment = computed(() => rows.value.find((moment) => moment.id === active.value))
@@ -799,6 +813,8 @@ function applySlots(saved) {
     const previous = Number.isInteger(raw) ? null : {
       showLyrics: raw.lyrics === 'contentAlt' || raw.lyrics === 'content' ? raw.lyrics : undefined,
       showEstrofes: Array.isArray(raw.estrofes) || Number.isInteger(raw.estrofes) ? raw.estrofes : undefined,
+      showTempo: typeof raw.season === 'string' ? raw.season : undefined,
+      showSunday: typeof raw.sunday === 'string' ? raw.sunday : undefined,
     }
     slots[moment] = withShow(song, previous)
   }
@@ -1034,14 +1050,37 @@ function setShow(moment, patch) {
   const song = slots[moment]
   if (!song) return
   const next = { ...song, ...patch }
-  if (patch.showLyrics && patch.showLyrics !== shownLyrics(song)) {
-    next.showEstrofes = keepEstrofes(next, song.showEstrofes)
+  if ((patch.showLyrics && patch.showLyrics !== shownLyrics(song))
+      || Object.prototype.hasOwnProperty.call(patch, 'showTempo')
+      || Object.prototype.hasOwnProperty.call(patch, 'showSunday')) {
+    next.showEstrofes = keepEstrofes(next, song.showEstrofes, chosenMark(next))
   }
   slots[moment] = next
 }
 
 function shownLyrics(song) {
   return song?.showLyrics || preferredLyrics(song)
+}
+
+function boxMark(song) {
+  if (song?.verseSeasons?.length) return liturgy.value?.season || 'comum'
+  if (song?.verseSundays?.length) return liturgy.value?.sunday || song.verseSundays[0]
+  return ''
+}
+
+function chosenMark(song) {
+  if (song?.verseSeasons?.length) return song.showTempo || boxMark(song)
+  if (song?.verseSundays?.length) return song.showSunday || boxMark(song)
+  return ''
+}
+
+function dayMarkLabel(song) {
+  const mark = boxMark(song)
+  if (!song?.verseSundays?.length) return ''
+  if (song.verseSundayNames?.[mark]) return song.verseSundayNames[mark]
+  const day = liturgy.value
+  if (!day?.domingo) return ''
+  return day.ano ? `${day.domingo} · Ano ${day.ano}` : day.domingo
 }
 
 function unpick(id) {
@@ -1062,6 +1101,12 @@ function chooseMoment(id) {
 }
 
 function showNotice(notice) {
+  if (notice.readings) {
+    nextTick(() => {
+      document.getElementById('readings')?.scrollIntoView({ block: 'nearest' })
+    })
+    return
+  }
   if (!notice.moment) {
     return
   }
@@ -1125,7 +1170,7 @@ async function generate(replace = false) {
   for (const moment of moments.value) {
     const song = slots[moment.id]
     if (song?.bookId) {
-      const choice = slideChoice(song)
+      const choice = slideChoice(song, { mark: chosenMark(song), sendTempo: true })
       songs[moment.id] = Object.keys(choice).length ? { bookId: song.bookId, ...choice } : song.bookId
     }
   }
@@ -1393,9 +1438,16 @@ async function generate(replace = false) {
             </div>
             <span v-if="!moment.fixed && slots[moment.id]" class="choice-tokens">
               <SongShow :song="slots[moment.id]" @change="chooseShow(moment.id, $event)" />
+              <VerseTempo
+                :song="slots[moment.id]"
+                :fallback="boxMark(slots[moment.id])"
+                :fallback-label="dayMarkLabel(slots[moment.id])"
+                @change="chooseShow(moment.id, $event)"
+              />
               <Estrofes
                 compact
                 :song="slots[moment.id]"
+                :mark="chosenMark(slots[moment.id])"
                 :open="estrofesOpen === moment.id"
                 @open="showEstrofes(moment.id)"
                 @close="closeEstrofes"
@@ -1493,7 +1545,7 @@ async function generate(replace = false) {
       <p v-if="intervalMissing" class="interval-missing">{{ intervalMissing }}</p>
     </section>
 
-    <section v-if="liturgy" class="panel cover">
+    <section v-if="liturgy" id="readings" class="panel cover">
       <div class="panel-head">
         <h2>Capa e leituras</h2>
         <button

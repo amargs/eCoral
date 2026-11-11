@@ -52,9 +52,7 @@ public final class BookIds {
             } else if (!key.isEmpty() && songCounts.getOrDefault(key, 0) > 1 && warnedSlides.add(key)) {
                 warnings.add("Ambiguous slide title: " + song.title());
             }
-            attached.add(new SongCfg(
-                    song.id(), song.title(), song.content(), bookId,
-                    song.titleAlt(), song.contentAlt(), song.lang(), song.langAlt(), song.defaultLyrics()));
+            attached.add(song.retain(song.id(), song.title(), song.content(), bookId));
         }
         return attached;
     }

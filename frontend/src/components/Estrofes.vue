@@ -6,6 +6,7 @@ const props = defineProps({
   song: { type: Object, required: true },
   compact: { type: Boolean, default: false },
   open: { type: Boolean, default: false },
+  mark: { type: String, default: '' },
 })
 
 const emit = defineEmits(['change', 'open', 'close'])
@@ -18,7 +19,7 @@ let listening = false
 const titleId = computed(() => `estrofes-title-${props.song.id}`)
 const panelId = computed(() => `estrofes-panel-${props.song.id}`)
 
-const plan = computed(() => shownPlan(props.song))
+const plan = computed(() => shownPlan(props.song, props.mark))
 const numbers = computed(() => plan.value?.rows?.map((row) => row.n) || [])
 const total = computed(() => numbers.value.length)
 const chosen = computed(() => {
@@ -32,7 +33,7 @@ const chosen = computed(() => {
   }
   return numbers.value
 })
-const shortLabel = computed(() => estrofeCountLabel(props.song))
+const shortLabel = computed(() => estrofeCountLabel(props.song, props.mark))
 const changed = computed(() => shortLabel.value !== '' && shortLabel.value !== 'Todas as estrofes')
 const menuTitle = computed(() => shortLabel.value)
 const triggerLabel = computed(() => `Selecionar estrofes. ${menuTitle.value}`)

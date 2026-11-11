@@ -120,6 +120,31 @@ class SongCatalogTest {
         assertEquals(List.of("um", "dois"), again.song().content());
     }
 
+    @Test
+    void aSongVariesByTempoOrBySunday() throws Exception {
+        ObjectNode tempo = body(null, "Aleluia Glória ao Senhor", "A5", List.of("**Aleluia.**\nPáscoa", "  ", "**Aleluia.**\nNatal"));
+        tempo.set("verseSeasons", JSON.valueToTree(List.of("pascoa", "comum", "natal")));
+        SongCatalog.Saved saved = SongCatalog.save(List.of(), tempo);
+        assertEquals(List.of("**Aleluia.**\nPáscoa", "**Aleluia.**\nNatal"), saved.song().content());
+        assertEquals(List.of("pascoa", "natal"), saved.song().verseSeasons());
+        assertNull(saved.song().verseSundays());
+
+        ObjectNode sunday = body(saved.song().id(), "Louvor a vós", "L1", List.of("Ano A", "Ano B"));
+        sunday.set("verseSundays", JSON.valueToTree(List.of("lent-1/A", "lent-3/B")));
+        SongCfg bySunday = SongCatalog.save(saved.songs(), sunday).song();
+        assertNull(bySunday.verseSeasons());
+        assertEquals(List.of("lent-1/A", "lent-3/B"), bySunday.verseSundays());
+
+        ObjectNode both = sunday.deepCopy();
+        both.set("verseSeasons", JSON.valueToTree(List.of("quaresma", "quaresma")));
+        IllegalArgumentException mixed = assertThrows(
+                IllegalArgumentException.class, () -> SongCatalog.save(List.of(bySunday), both));
+        assertEquals("Um cântico muda com o tempo ou com o domingo.", mixed.getMessage());
+
+        ObjectNode cleared = body(bySunday.id(), "Louvor a vós", "L1", List.of("Ano A", "Ano B"));
+        assertNull(SongCatalog.save(List.of(bySunday), cleared).song().verseSundays());
+    }
+
     private static ObjectNode body(Integer id, String title, String bookId, List<String> content) throws Exception {
         ObjectNode body = JSON.createObjectNode();
         if (id != null) {

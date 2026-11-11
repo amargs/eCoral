@@ -58,7 +58,7 @@ public final class DeckService {
             LOG.info("Filled cover text");
             List<Generated.Song> placed = new ArrayList<>();
             int slideCount = 1;
-            for (Picked picked : pick(songs, selection)) {
+            for (Picked picked : pick(songs, selection, VerseContext.NONE)) {
                 slideCount += appendSong(templatePpt, titleLayout, lyricLayout, fits, picked, placed);
             }
 
@@ -84,7 +84,7 @@ public final class DeckService {
 
         List<SongCfg> songs = SongIndex.read(config.indexFile());
         LOG.info("Read index (" + songs.size() + " songs)");
-        List<Picked> picked = pick(songs, selection);
+        List<Picked> picked = pick(songs, selection, VerseContext.NONE);
         if (picked.isEmpty()) {
             throw new IllegalArgumentException("A song deck needs at least one song.");
         }
@@ -281,7 +281,8 @@ public final class DeckService {
                     : null;
             MassAssembler deck = new MassAssembler(
                     templatePpt, titleLayout, lyricLayout, fits, songs, mass.interval(), picture,
-                    choices == null ? Map.of() : choices, season.slideAccent());
+                    choices == null ? Map.of() : choices, season.slideAccent(),
+                    VerseContext.forDate(mass.date()));
             XSLFSlide coverSlide = addCover(templatePpt, config.template4x3(), mass.cover(), season);
             deck.slides++;
             deck.interval();
@@ -378,6 +379,7 @@ public final class DeckService {
         private final XSLFPictureData picture;
         private final Map<String, SlideChoice> choices;
         private final String scriptureAccent;
+        private final VerseContext verses;
         private final List<Picked> placedSongs = new ArrayList<>();
         private final List<Generated.Song> placed = new ArrayList<>();
         private int slides;
@@ -392,7 +394,8 @@ public final class DeckService {
                 Interval intervalChoice,
                 XSLFPictureData picture,
                 Map<String, SlideChoice> choices,
-                String scriptureAccent) {
+                String scriptureAccent,
+                VerseContext verses) {
             this.ppt = ppt;
             this.titleLayout = titleLayout;
             this.lyricLayout = lyricLayout;
@@ -402,6 +405,7 @@ public final class DeckService {
             this.picture = picture;
             this.choices = choices;
             this.scriptureAccent = scriptureAccent;
+            this.verses = verses == null ? VerseContext.NONE : verses;
         }
 
         private void song(String moment, String bookId, boolean trailingInterval) throws IOException {
@@ -410,7 +414,12 @@ public final class DeckService {
             }
             SongCfg found = findBook(songs, bookId);
             SlideChoice choice = choices.get(moment);
-            Picked picked = new Picked(bookId, choice == null ? found.prepared() : choice.show(found));
+            SongCfg shown = SlideChoice.resolve(found, choice, verses);
+            if (shown == null) {
+                LOG.info(SlideChoice.leftOut(found, choice, verses));
+                return;
+            }
+            Picked picked = new Picked(bookId, shown);
             slides += appendSong(ppt, titleLayout, lyricLayout, fits, picked, placed);
             placedSongs.add(picked);
             markContent();
@@ -660,8 +669,9 @@ public final class DeckService {
         return new SongCfg(song.id(), song.title(), verses, song.bookId(), song.titleAlt(), null);
     }
 
-    private static List<Picked> pick(List<SongCfg> songs, Selection selection) {
+    private static List<Picked> pick(List<SongCfg> songs, Selection selection, VerseContext context) {
         List<Picked> picked = new ArrayList<>();
+        String omitted = null;
         if (selection instanceof Selection.Ids byId) {
             List<SlideChoice> choices = byId.choices();
             List<Integer> ids = byId.ids();
@@ -669,18 +679,39 @@ public final class DeckService {
                 int id = ids.get(i);
                 SlideChoice choice = choices == null || i >= choices.size() ? null : choices.get(i);
                 SongCfg song = findId(songs, id);
-                picked.add(new Picked(Integer.toString(id), choice == null ? song.prepared() : choice.show(song)));
+                SongCfg shown = SlideChoice.resolve(song, choice, context);
+                if (shown == null) {
+                    String line = SlideChoice.leftOut(song, choice, context);
+                    LOG.info(line);
+                    if (omitted == null) {
+                        omitted = line;
+                    }
+                    continue;
+                }
+                picked.add(new Picked(Integer.toString(id), shown));
             }
-            return picked;
+        } else {
+            Selection.BookIds byBook = (Selection.BookIds) selection;
+            List<SlideChoice> choices = byBook.choices();
+            List<String> bookIds = byBook.bookIds();
+            for (int i = 0; i < bookIds.size(); i++) {
+                String bookId = bookIds.get(i);
+                SlideChoice choice = choices == null || i >= choices.size() ? null : choices.get(i);
+                SongCfg song = findBook(songs, bookId);
+                SongCfg shown = SlideChoice.resolve(song, choice, context);
+                if (shown == null) {
+                    String line = SlideChoice.leftOut(song, choice, context);
+                    LOG.info(line);
+                    if (omitted == null) {
+                        omitted = line;
+                    }
+                    continue;
+                }
+                picked.add(new Picked(bookId, shown));
+            }
         }
-        Selection.BookIds byBook = (Selection.BookIds) selection;
-        List<SlideChoice> choices = byBook.choices();
-        List<String> bookIds = byBook.bookIds();
-        for (int i = 0; i < bookIds.size(); i++) {
-            String bookId = bookIds.get(i);
-            SlideChoice choice = choices == null || i >= choices.size() ? null : choices.get(i);
-            SongCfg song = findBook(songs, bookId);
-            picked.add(new Picked(bookId, choice == null ? song.prepared() : choice.show(song)));
+        if (picked.isEmpty() && omitted != null) {
+            throw new IllegalArgumentException(omitted);
         }
         return picked;
     }

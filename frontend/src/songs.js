@@ -134,10 +134,29 @@ export function shownLyrics(song) {
   return song?.showLyrics || preferredLyrics(song)
 }
 
-/** The estrofe groups for the language the deck is using. */
-export function shownPlan(song) {
+/** The tempo or Sunday whose text boxes this deck is using. */
+export function activeMark(song) {
+  if (song?.verseSeasons?.length) return song.showTempo || 'comum'
+  if (song?.verseSundays?.length) return song.showSunday || song.verseSundays[0]
+  return ''
+}
+
+export function markLabel(song, mark = activeMark(song)) {
+  if (!mark) return ''
+  if (song?.verseSundays?.length) return song.verseSundayNames?.[mark] || mark
+  return SEASONS.find((item) => item.id === mark)?.label || mark
+}
+
+/** The estrofe groups for the language, and the tempo or Sunday, the deck is using. */
+export function shownPlan(song, mark) {
   if (!song) return null
-  return shownLyrics(song) === 'contentAlt' ? song.estrofesAlt || null : song.estrofes || null
+  const alt = shownLyrics(song) === 'contentAlt'
+  if (song.verseSeasons?.length || song.verseSundays?.length) {
+    const key = mark || activeMark(song)
+    const plans = alt ? song.estrofesAltByMark : song.estrofesByMark
+    return key && plans ? plans[key] || null : null
+  }
+  return alt ? song.estrofesAlt || null : song.estrofes || null
 }
 
 /** The language now shown, when the song has two. */
@@ -148,8 +167,8 @@ export function languageLabel(song) {
 }
 
 /** How many estrofes are included, when the song offers that choice. */
-export function estrofeCountLabel(song) {
-  const rows = shownPlan(song)?.rows?.map((row) => row.n) || []
+export function estrofeCountLabel(song, mark) {
+  const rows = shownPlan(song, mark)?.rows?.map((row) => row.n) || []
   if (rows.length < 2) return ''
   const raw = song.showEstrofes
   let count = rows.length
@@ -164,8 +183,8 @@ export function estrofeCountLabel(song) {
 }
 
 /** The estrofes still included. Absent means every estrofe. */
-export function keepEstrofes(song, chosen) {
-  const plan = shownPlan(song)
+export function keepEstrofes(song, chosen, mark) {
+  const plan = shownPlan(song, mark)
   const rows = plan?.rows?.map((row) => row.n) || []
   if (!rows.length) return undefined
   let picked
@@ -187,12 +206,13 @@ function lyricsChoice(song) {
 }
 
 /** The slide choice sent when generating. Positions are omitted when every text box is kept. */
-export function slideChoice(song) {
+export function slideChoice(song, options = {}) {
   const choice = {}
   const lyrics = lyricsChoice(song)
   if (lyrics) choice.lyrics = lyrics
-  const plan = shownPlan(song)
-  const picked = keepEstrofes(song, song?.showEstrofes)
+  const mark = options.mark
+  const plan = shownPlan(song, mark)
+  const picked = keepEstrofes(song, song?.showEstrofes, mark)
   if (plan && picked) {
     const slides = []
     for (const row of plan.rows) {
@@ -200,6 +220,8 @@ export function slideChoice(song) {
     }
     if (slides.length) choice.slides = slides
   }
+  if (options.sendTempo && song?.verseSeasons?.length) choice.season = song.showTempo || options.mark || 'comum'
+  if (options.sendTempo && song?.verseSundays?.length) choice.sunday = song.showSunday || options.mark || song.verseSundays[0]
   return choice
 }
 
@@ -210,6 +232,8 @@ export function rememberedChoice(song) {
   if (lyrics) choice.lyrics = lyrics
   const picked = keepEstrofes(song, song?.showEstrofes)
   if (picked) choice.estrofes = picked
+  if (song?.showTempo) choice.season = song.showTempo
+  if (song?.showSunday) choice.sunday = song.showSunday
   return choice
 }
 
@@ -223,6 +247,10 @@ export function withShow(song, previous) {
     showLyrics = 'content'
   }
   const next = { ...song, showLyrics }
+  if (song.verseSeasons?.length && previous?.showTempo) next.showTempo = previous.showTempo
+  if (song.verseSundays?.length && previous?.showSunday && song.verseSundays.includes(previous.showSunday)) {
+    next.showSunday = previous.showSunday
+  }
   const picked = keepEstrofes(next, previous?.showEstrofes)
   if (picked) next.showEstrofes = picked
   return next

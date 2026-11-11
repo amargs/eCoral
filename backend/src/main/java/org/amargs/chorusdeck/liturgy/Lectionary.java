@@ -73,6 +73,21 @@ public final class Lectionary {
         return BY_KEY.get(key);
     }
 
+    /** The lectionary name, plus the year when the Sunday has one. */
+    public static String label(String key) {
+        Entry entry = find(key);
+        if (entry == null) {
+            return key;
+        }
+        int slash = key.lastIndexOf('/');
+        String id = slash < 0 ? key : key.substring(0, slash);
+        String name = menuName(id);
+        if (entry.ano() == null || entry.ano().isBlank()) {
+            return name;
+        }
+        return name + " · Ano " + entry.ano();
+    }
+
     private static List<Spec> sequence() {
         List<Spec> specs = new ArrayList<>();
         specs.add(spec("advent-1", true, "advento", false, false, null));

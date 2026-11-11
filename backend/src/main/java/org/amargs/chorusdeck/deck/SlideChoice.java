@@ -2,15 +2,20 @@ package org.amargs.chorusdeck.deck;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import org.amargs.chorusdeck.index.SongCfg;
+import org.amargs.chorusdeck.liturgy.Lectionary;
 
 import java.util.ArrayList;
 import java.util.List;
 
 /** Which language, and which text boxes, one deck shows for a song. The slide title is always the main title. */
-public record SlideChoice(String title, String lyrics, List<Integer> slides) {
+public record SlideChoice(String title, String lyrics, List<Integer> slides, String season, String sunday) {
 
     public SlideChoice(String title, String lyrics) {
-        this(title, lyrics, null);
+        this(title, lyrics, null, null, null);
+    }
+
+    public SlideChoice(String title, String lyrics, List<Integer> slides) {
+        this(title, lyrics, slides, null, null);
     }
 
     public SlideChoice {
@@ -34,10 +39,19 @@ public record SlideChoice(String title, String lyrics, List<Integer> slides) {
             }
             slides = List.copyOf(slides);
         }
+        if (season != null && !SongCfg.SEASONS.contains(season)) {
+            throw new IllegalArgumentException("Unknown season: " + season);
+        }
+        if (sunday != null && Lectionary.find(sunday) == null) {
+            throw new IllegalArgumentException("Unknown Sunday: " + sunday);
+        }
+        if (season != null && sunday != null) {
+            throw new IllegalArgumentException("A song choice has a tempo or a Sunday.");
+        }
     }
 
     public boolean isDefault() {
-        return lyrics == null && slides == null;
+        return lyrics == null && slides == null && season == null && sunday == null;
     }
 
     public static SlideChoice from(JsonNode node) {
@@ -47,15 +61,37 @@ public record SlideChoice(String title, String lyrics, List<Integer> slides) {
         if (!node.isObject()) {
             throw new IllegalArgumentException("A song choice must be an object.");
         }
-        SlideChoice choice = new SlideChoice(text(node, "title"), text(node, "lyrics"), slides(node));
+        SlideChoice choice = new SlideChoice(
+                text(node, "title"), text(node, "lyrics"), slides(node), text(node, "season"), text(node, "sunday"));
         return choice.isDefault() ? null : choice;
+    }
+
+    public static SongCfg resolve(SongCfg song, SlideChoice choice, VerseContext context) {
+        SlideChoice used = choice == null ? new SlideChoice(null, null) : choice;
+        return used.show(song, context == null ? VerseContext.NONE : context);
+    }
+
+    /** Names the song and the tempo or Sunday that had no text box. */
+    public static String leftOut(SongCfg song, SlideChoice choice, VerseContext context) {
+        SlideChoice used = choice == null ? new SlideChoice(null, null) : choice;
+        String mark = VerseBoxes.mark(song, used.season, used.sunday, context);
+        String name = song.bookId() == null || song.bookId().isBlank()
+                ? song.title().trim()
+                : song.bookId().trim() + " " + song.title().trim();
+        return name + " has no text box for " + VerseBoxes.label(song, mark) + ". It is left out.";
     }
 
     /** The verses the slides use, under the main title. The library song is left as it was. */
     public SongCfg show(SongCfg song) {
-        if (isDefault()) {
-            return song.prepared();
-        }
+        return show(song, VerseContext.NONE);
+    }
+
+    /**
+     * The verses of the chosen language that belong to this tempo or Sunday.
+     * Null when that tempo or Sunday has no text box: the deck leaves the song out.
+     */
+    public SongCfg show(SongCfg song, VerseContext context) {
+        VerseContext used = context == null ? VerseContext.NONE : context;
         boolean second = "contentAlt".equals(lyrics)
                 || (lyrics == null && "contentAlt".equals(song.defaultLyrics()));
         List<String> verses;
@@ -66,6 +102,20 @@ public record SlideChoice(String title, String lyrics, List<Integer> slides) {
             verses = song.contentAlt();
         } else {
             verses = song.content() == null ? List.of() : song.content();
+        }
+        if (song.verseSeasons() != null || song.verseSundays() != null) {
+            String mark = VerseBoxes.mark(song, season, sunday, used);
+            if (song.verseSeasons() != null && mark != null && !SongCfg.SEASONS.contains(mark)) {
+                throw new IllegalArgumentException("Unknown season: " + mark);
+            }
+            if (song.verseSundays() != null && mark != null && Lectionary.find(mark) == null) {
+                throw new IllegalArgumentException("Unknown Sunday: " + mark);
+            }
+            List<String> marks = song.verseSeasons() != null ? song.verseSeasons() : song.verseSundays();
+            verses = mark == null ? List.of() : VerseBoxes.of(verses, marks, mark);
+            if (verses.isEmpty()) {
+                return null;
+            }
         }
         verses = keep(song.id(), verses, slides);
         if (verses.isEmpty()) {

@@ -6,12 +6,17 @@ import org.amargs.chorusdeck.deck.Cover;
 import org.amargs.chorusdeck.deck.Estrofes;
 import org.amargs.chorusdeck.deck.Season;
 import org.amargs.chorusdeck.deck.SlideChoice;
+import org.amargs.chorusdeck.deck.VerseBoxes;
+import org.amargs.chorusdeck.deck.VerseContext;
 import org.amargs.chorusdeck.index.SongCfg;
+import org.amargs.chorusdeck.liturgy.Lectionary;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 /** The song-deck page's view of the index, and the generate body it posts. */
 public final class SongDeckRequests {
@@ -32,7 +37,12 @@ public final class SongDeckRequests {
             String langAlt,
             String defaultLyrics,
             Estrofes.Plan estrofes,
-            Estrofes.Plan estrofesAlt) {
+            Estrofes.Plan estrofesAlt,
+            List<String> verseSeasons,
+            List<String> verseSundays,
+            Map<String, String> verseSundayNames,
+            Map<String, Estrofes.Plan> estrofesByMark,
+            Map<String, Estrofes.Plan> estrofesAltByMark) {
     }
 
     public record Ready(List<Integer> ids, Path output, Cover cover, List<SlideChoice> choices) {
@@ -54,10 +64,17 @@ public final class SongDeckRequests {
             String lang = versesAlt > 0 ? song.lang() : null;
             String langAlt = versesAlt > 0 ? song.langAlt() : null;
             String defaultLyrics = versesAlt > 0 ? song.defaultLyrics() : null;
+            List<String> marks = song.verseSeasons() != null ? song.verseSeasons() : song.verseSundays();
             views.add(new SongView(
                     song.id(), song.title(), titleAlt, bookId,
                     verses > 0 || versesAlt > 0, verses, versesAlt, lang, langAlt, defaultLyrics,
-                    Estrofes.plan(song.content(), bookId), Estrofes.plan(song.contentAlt(), bookId)));
+                    marks == null ? Estrofes.plan(song.content(), bookId) : null,
+                    marks == null ? Estrofes.plan(song.contentAlt(), bookId) : null,
+                    song.verseSeasons(),
+                    song.verseSundays(),
+                    sundayNames(song.verseSundays()),
+                    plans(song.content(), marks, bookId),
+                    plans(song.contentAlt(), marks, bookId)));
         }
         return views;
     }
@@ -97,18 +114,42 @@ public final class SongDeckRequests {
                 throw new IllegalArgumentException("Song ids start at 1.");
             }
             SongCfg song = find(songs, id);
-            if (choice == null) {
-                SongCfg shown = song.prepared();
-                if (shown.content() == null || shown.content().isEmpty()) {
-                    throw new IllegalArgumentException("Song " + id + " has no verses.");
-                }
-            } else {
-                choice.show(song);
+            SongCfg shown = SlideChoice.resolve(song, choice, VerseContext.NONE);
+            if (shown != null && (shown.content() == null || shown.content().isEmpty())) {
+                throw new IllegalArgumentException("Song " + id + " has no verses.");
             }
             ids.add(id);
             choices.add(choice);
         }
         return new Picked(ids, choices);
+    }
+
+    private static Map<String, String> sundayNames(List<String> sundays) {
+        if (sundays == null) {
+            return null;
+        }
+        Map<String, String> names = new LinkedHashMap<>();
+        for (String sunday : sundays) {
+            names.putIfAbsent(sunday, Lectionary.label(sunday));
+        }
+        return names;
+    }
+
+    private static Map<String, Estrofes.Plan> plans(List<String> verses, List<String> marks, String bookId) {
+        if (marks == null || verses == null || verses.isEmpty()) {
+            return null;
+        }
+        Map<String, Estrofes.Plan> plans = new LinkedHashMap<>();
+        for (String mark : marks) {
+            if (plans.containsKey(mark)) {
+                continue;
+            }
+            Estrofes.Plan plan = Estrofes.plan(VerseBoxes.of(verses, marks, mark), bookId);
+            if (plan != null) {
+                plans.put(mark, plan);
+            }
+        }
+        return plans.isEmpty() ? null : plans;
     }
 
     private static SongCfg find(List<SongCfg> songs, int id) {

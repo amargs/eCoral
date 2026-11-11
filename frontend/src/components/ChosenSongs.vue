@@ -2,6 +2,7 @@
 import { nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import Estrofes from './Estrofes.vue'
 import SongShow from './SongShow.vue'
+import VerseTempo from './VerseTempo.vue'
 import { songControlName } from '../songs.js'
 
 const props = defineProps({
@@ -495,6 +496,7 @@ async function runDepart() {
         </div>
         <span class="choice-tokens">
           <SongShow :song="song" @change="emit('show', songIndex(song), $event)" />
+          <VerseTempo :song="song" @change="emit('show', songIndex(song), $event)" />
           <Estrofes
             compact
             :song="song"

@@ -4,6 +4,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.amargs.chorusdeck.config.AppConfig;
 import org.amargs.chorusdeck.index.SongCfg;
 import org.amargs.chorusdeck.index.SongIndex;
+import org.amargs.chorusdeck.liturgy.Lectionary;
+import org.amargs.chorusdeck.liturgy.LiturgicalCalendar;
+import org.amargs.chorusdeck.liturgy.LiturgyDay;
 import org.amargs.chorusdeck.web.SongDeckRequests;
 import org.apache.poi.xslf.usermodel.XMLSlideShow;
 import org.apache.poi.xslf.usermodel.XSLFNotes;
@@ -19,6 +22,7 @@ import org.junit.jupiter.api.Test;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.LocalDate;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
@@ -243,6 +247,152 @@ class SlideChoiceTest {
             assertFalse(slideText(ppt).contains("Glória"));
         }
         assertEquals(before, Files.readString(index));
+    }
+
+    @Test
+    void aTempoOrSundayKeepsOnlyThoseTextBoxes() throws Exception {
+        SongCfg alleluia = new SongCfg(
+                5, "Aleluia Glória ao Senhor",
+                List.of("**Aleluia.**\nVerso da Páscoa", "**Aleluia.**\nVerso do Natal"),
+                "A5", null, null, null, null, null, List.of("pascoa", "natal"), null);
+        SongCfg louvor = new SongCfg(
+                6, "Louvor a vós",
+                List.of("Estrofe do ano A", "Estrofe do ano B"),
+                "L1", null, null, null, null, null, null, List.of("lent-1/A", "lent-3/B"));
+        SongCfg plain = new SongCfg(1, "Pelos caminhos", List.of("um"), "12");
+        SongCfg parted = new SongCfg(
+                8, "Partilhai",
+                List.of("Primeira estrofe do comum", "**Refrão**", "Segunda estrofe do comum", "Estrofe da Páscoa"),
+                "20", null, null, null, null, null,
+                List.of("comum", "comum", "comum", "pascoa"), null);
+
+        assertNull(new SlideChoice(null, null, null, "quaresma", null).show(alleluia));
+        VerseContext ordinary = VerseContext.forDate(dateOf("ordinary-29/A"));
+        assertEquals(List.of("**Aleluia.**\nVerso do Natal"),
+                new SlideChoice(null, null, null, "natal", null).show(alleluia, ordinary).content());
+        assertNull(new SlideChoice(null, null).show(alleluia, ordinary));
+        VerseContext lent = VerseContext.forDate(dateOf("lent-1/A"));
+        assertEquals(List.of("Estrofe do ano B"),
+                new SlideChoice(null, null, null, null, "lent-3/B").show(louvor, lent).content());
+        assertEquals(
+                List.of("**Aleluia.**\nVerso da Páscoa"),
+                new SlideChoice(null, null, null, "pascoa", null).show(alleluia).content());
+        assertEquals(
+                List.of("Estrofe do ano B"),
+                new SlideChoice(null, null, null, null, "lent-3/B").show(louvor).content());
+        assertEquals(List.of("um"), new SlideChoice(null, null, null, "pascoa", null).show(plain).content());
+        assertEquals(
+                List.of("Primeira estrofe do comum"),
+                new SlideChoice(null, null, List.of(1), "comum", null).show(parted).content());
+        assertEquals(List.of("comum", "comum", "comum", "pascoa"), parted.verseSeasons());
+
+        assertEquals(List.of("pascoa", "natal"), SongDeckRequests.songs(List.of(alleluia)).get(0).verseSeasons());
+        assertNull(SongDeckRequests.songs(List.of(alleluia)).get(0).estrofesByMark());
+        assertEquals("Domingo III da Quaresma · Ano B", SongDeckRequests.songs(List.of(louvor)).get(0).verseSundayNames().get("lent-3/B"));
+
+        Path dir = Files.createTempDirectory("verse-marks");
+        Path index = dir.resolve("index.json");
+        SongIndex.write(index, List.of(alleluia, louvor, plain));
+        String before = Files.readString(index);
+        Path natal = dir.resolve("natal.pptx");
+        new DeckService().generateSongs(
+                new AppConfig(Path.of("unused.pptx"), index, template(), natal),
+                new DeckService.Selection.Ids(List.of(5), List.of(new SlideChoice(null, null, null, "natal", null))),
+                null);
+        try (XMLSlideShow ppt = open(natal)) {
+            String text = slideText(ppt);
+            assertTrue(text.contains("Verso do Natal"));
+            assertFalse(text.contains("Verso da Páscoa"));
+        }
+
+        IllegalArgumentException leftOut = assertThrows(IllegalArgumentException.class, () -> new DeckService().generateSongs(
+                new AppConfig(Path.of("unused.pptx"), index, template(), dir.resolve("comum.pptx")),
+                new DeckService.Selection.Ids(List.of(5), List.of()),
+                null));
+        assertTrue(leftOut.getMessage().contains("Aleluia Glória ao Senhor"));
+        assertTrue(leftOut.getMessage().contains("Tempo Comum"));
+
+        Path easterOut = dir.resolve("pascoa.pptx");
+        new DeckService().generateMass(
+                new AppConfig(Path.of("unused.pptx"), index, template(), easterOut),
+                mass(dir.resolve("pascoa.yaml"), "easter-sunday/A", "A5"));
+        try (XMLSlideShow ppt = open(easterOut)) {
+            String text = slideText(ppt);
+            assertTrue(text.contains("Verso da Páscoa"));
+            assertFalse(text.contains("Verso do Natal"));
+        }
+
+        Path ordinaryOut = dir.resolve("comum-missa.pptx");
+        new DeckService().generateMass(
+                new AppConfig(Path.of("unused.pptx"), index, template(), ordinaryOut),
+                mass(dir.resolve("comum.yaml"), "ordinary-29/A", "A5"));
+        try (XMLSlideShow ppt = open(ordinaryOut)) {
+            String text = slideText(ppt);
+            assertFalse(text.contains("Verso da Páscoa"));
+            assertFalse(text.contains("Verso do Natal"));
+        }
+
+        Path lentOut = dir.resolve("quaresma.pptx");
+        new DeckService().generateMass(
+                new AppConfig(Path.of("unused.pptx"), index, template(), lentOut),
+                mass(dir.resolve("quaresma.yaml"), "lent-3/B", "L1"));
+        try (XMLSlideShow ppt = open(lentOut)) {
+            String text = slideText(ppt);
+            assertTrue(text.contains("Estrofe do ano B"));
+            assertFalse(text.contains("Estrofe do ano A"));
+        }
+        assertEquals(before, Files.readString(index));
+
+        Path catalogue = dir.resolve("todos.pptx");
+        new DeckService().generateCatalogue(new AppConfig(Path.of("unused.pptx"), index, template(), catalogue));
+        try (XMLSlideShow ppt = open(catalogue)) {
+            String text = slideText(ppt);
+            assertTrue(text.contains("Verso da Páscoa"));
+            assertTrue(text.contains("Verso do Natal"));
+            assertTrue(text.contains("Estrofe do ano A"));
+            assertTrue(text.contains("Estrofe do ano B"));
+        }
+        assertEquals(before, Files.readString(index));
+    }
+
+    private static MassRequest mass(Path yaml, String sunday, String book) throws Exception {
+        LocalDate date = dateOf(sunday);
+        String season = Lectionary.find(sunday).season();
+        Files.writeString(yaml, """
+                season: %s
+                ano: A
+                domingo: Domingo
+                frase: frase
+                versiculo: Jo 1, 1
+                output: missa.pptx
+                songs:
+                  entrada: "%s"
+                opcoes:
+                  credo: breve
+                  interval: vazio
+                """.formatted(season, book));
+        return MassRequest.load(yaml).withLiturgy(new LiturgyDay(
+                date,
+                "Domingo",
+                season,
+                null,
+                "A",
+                new LiturgyDay.Reading("", ""),
+                null,
+                "",
+                new LiturgyDay.Reading("", ""),
+                null));
+    }
+
+    private static LocalDate dateOf(String key) {
+        for (int year = 2024; year <= 2030; year++) {
+            for (LiturgicalCalendar.Celebration day : LiturgicalCalendar.yearOf(LocalDate.of(year, 6, 1))) {
+                if (key.equals(day.key())) {
+                    return day.date();
+                }
+            }
+        }
+        throw new AssertionError(key);
     }
 
     private static byte[] slideLogo(XSLFSlide slide) {
