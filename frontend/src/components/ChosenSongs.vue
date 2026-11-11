@@ -17,7 +17,9 @@ const displaySongs = ref(props.songs)
 const holdEmpty = ref(false)
 const emptyEntering = ref(false)
 const live = new Set()
+const rowMoves = new Set()
 let flight = 0
+let moveToken = 0
 
 const ease = 'cubic-bezier(0.16, 1, 0.3, 1)'
 
@@ -26,9 +28,13 @@ watch(() => props.songs, (songs, previous) => {
   const after = songs.length
   if (before === after) {
     if (holdEmpty.value || emptyEntering.value) return
+    const reorder = previous && !sameOrder(previous, songs) && sameMembers(previous, songs)
+    const beforeTops = reorder && !prefersReduced() ? rowTops() : null
     displaySongs.value = songs
+    if (beforeTops) slideRows(beforeTops)
     return
   }
+  cancelRowMoves()
   cancelLive()
   const token = ++flight
   if (before === 0 && after > 0) {
@@ -39,7 +45,7 @@ watch(() => props.songs, (songs, previous) => {
     settleArrival(token)
     return
   }
-  if (before === 1 && after === 0) {
+  if (before > 0 && after === 0) {
     unlockStage()
     holdEmpty.value = false
     emptyEntering.value = true
@@ -55,9 +61,65 @@ watch(() => props.songs, (songs, previous) => {
 
 onBeforeUnmount(() => {
   flight += 1
+  moveToken += 1
+  cancelRowMoves()
   cancelLive()
   unlockStage()
 })
+
+function sameOrder(a, b) {
+  return a.every((song, index) => song.id === b[index].id)
+}
+
+function sameMembers(a, b) {
+  if (a.length !== b.length) return false
+  const ids = new Set(a.map((song) => song.id))
+  return b.every((song) => ids.has(song.id))
+}
+
+function rowTops() {
+  const tops = new Map()
+  for (const row of list.value?.querySelectorAll('.chosen-song') ?? []) {
+    tops.set(row.dataset.id, row.getBoundingClientRect().top)
+  }
+  return tops
+}
+
+async function slideRows(beforeTops) {
+  const token = ++moveToken
+  await nextTick()
+  if (token !== moveToken) return
+  cancelRowMoves()
+  const rows = list.value?.querySelectorAll('.chosen-song') ?? []
+  for (const row of rows) {
+    row.classList.remove('is-sliding')
+    row.style.willChange = ''
+  }
+  for (const row of rows) {
+    const previousTop = beforeTops.get(row.dataset.id)
+    if (previousTop == null) continue
+    const delta = previousTop - row.getBoundingClientRect().top
+    if (Math.abs(delta) < 0.5) continue
+    row.classList.add('is-sliding')
+    row.style.willChange = 'transform'
+    const animation = row.animate(
+      [{ transform: `translateY(${delta}px)` }, { transform: 'translateY(0px)' }],
+      { duration: 220, easing: ease },
+    )
+    rowMoves.add(animation)
+    animation.finished.finally(() => {
+      rowMoves.delete(animation)
+      if (token !== moveToken) return
+      row.classList.remove('is-sliding')
+      row.style.willChange = ''
+    }).catch(() => {})
+  }
+}
+
+function cancelRowMoves() {
+  for (const animation of rowMoves) animation.cancel()
+  rowMoves.clear()
+}
 
 function showEstrofes(id) {
   estrofesOpen.value = estrofesOpen.value === id ? null : id
@@ -131,6 +193,7 @@ async function settleDepart(token) {
 }
 
 function clearWillChange() {
+  if (list.value) list.value.style.willChange = ''
   const song = list.value?.querySelector('.chosen-song')
   if (song) song.style.willChange = ''
   if (emptyEl.value) emptyEl.value.style.willChange = ''
@@ -165,9 +228,9 @@ async function runArrival() {
 
 async function runDepart() {
   const empty = emptyEl.value
-  const song = list.value?.querySelector('.chosen-song')
-  if (!empty || !song) return
-  await fadePair(empty, song, 'in')
+  const songs = list.value
+  if (!empty || !songs) return
+  await fadePair(empty, songs, 'in')
 }
 </script>
 
@@ -213,7 +276,7 @@ async function runDepart() {
       :class="{ arriving: holdEmpty, 'songs-departing': emptyEntering }"
       :aria-hidden="emptyEntering ? 'true' : undefined"
     >
-      <li v-for="(song, index) in displaySongs" :key="`${song.id}-${index}`" class="chosen-song">
+      <li v-for="(song, index) in displaySongs" :key="song.id" :data-id="song.id" class="chosen-song">
         <div class="chosen-body">
           <span class="song-label">
             <span class="book-badge">{{ song.bookId || '#' }}</span>

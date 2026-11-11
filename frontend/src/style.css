@@ -1529,6 +1529,12 @@ button.choice-token[aria-expanded="true"] {
   flex-wrap: wrap;
 }
 
+.chosen-song.is-sliding {
+  position: relative;
+  z-index: 1;
+  background: #fff;
+}
+
 .estrofes {
   order: 1;
   flex: 1 0 100%;
