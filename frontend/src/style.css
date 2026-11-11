@@ -190,24 +190,6 @@ select option:checked {
   color: #1c1915;
 }
 
-.font-banner {
-  flex: none;
-  background: #f4e4c4;
-  color: #5c3b12;
-  border-bottom: 1px solid #e0c48a;
-  padding: 0.75rem 1.5rem;
-}
-
-.font-banner p {
-  max-width: 1100px;
-  margin: 0 auto;
-}
-
-.font-banner a {
-  color: #5c3b12;
-  font-weight: 650;
-}
-
 .page {
   width: 100%;
   max-width: 1180px;
@@ -3147,6 +3129,39 @@ button.icon.row-remove:hover {
 
 .status.error {
   color: #8d2a2a;
+}
+
+.font-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  margin: 0.9rem 0 0;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid #e7c4c4;
+  border-radius: 8px;
+  background: #fdf2f2;
+  color: #8d2a2a;
+}
+
+.font-notice svg {
+  flex: none;
+  width: 1.15rem;
+  height: 1.15rem;
+  margin-top: 0.12rem;
+}
+
+.font-notice p {
+  margin: 0;
+}
+
+.font-notice a {
+  color: var(--accent);
+  text-underline-offset: 0.15em;
+}
+
+.font-notice a:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 @media (max-width: 860px) {

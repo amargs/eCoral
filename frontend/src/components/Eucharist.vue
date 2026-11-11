@@ -5,12 +5,14 @@ import { ACCENTS, COVERS, MOMENTS, SEASONS, comingSunday, keepEstrofes, preferre
 import Estrofes from './Estrofes.vue'
 import SongShow from './SongShow.vue'
 import ShapeLine from './ShapeLine.vue'
+import FontNotice from './FontNotice.vue'
 
 const props = defineProps({
   songs: { type: Array, required: true },
   folder: { type: String, required: true },
   draft: { type: Object, default: null },
   shape: { type: String, required: true },
+  fonts: { type: Array, default: () => [] },
 })
 
 const emit = defineEmits(['choose-folder', 'generated', 'draft', 'restored', 'choose'])
@@ -274,7 +276,7 @@ const folderLeaf = computed(() => {
 })
 
 const canGenerate = computed(() =>
-  liturgy.value && !liturgyError.value && output.value.trim() && intervalReady.value && !loading.value)
+  liturgy.value && !liturgyError.value && output.value.trim() && intervalReady.value && !loading.value && !props.fonts.length)
 
 watch(rows, (list) => {
   if (!list.some((moment) => moment.id === active.value && !moment.fixed)) {
@@ -1213,7 +1215,7 @@ async function generate(replace = false) {
     const message = e instanceof Error ? e.message : 'Não foi possível gerar.'
     if (message.includes('ficheiro está aberto')) {
       fileOpen.value = message
-    } else {
+    } else if (!(props.fonts.length && message.includes('Install the missing font'))) {
       error.value = message
     }
   } finally {
@@ -1354,6 +1356,7 @@ async function generate(replace = false) {
         </button>
       </div>
       <p v-if="intervalMissing" class="open-names">{{ intervalMissing }}</p>
+      <FontNotice :fonts="fonts" />
       <p v-if="error" class="status error">{{ error }}</p>
     </section>
 

@@ -4,6 +4,7 @@ import ChosenSongs from './components/ChosenSongs.vue'
 import CoverFields from './components/CoverFields.vue'
 import ShapeLine from './components/ShapeLine.vue'
 import Eucharist from './components/Eucharist.vue'
+import FontNotice from './components/FontNotice.vue'
 import Library from './components/Library.vue'
 import SongList from './components/SongList.vue'
 import { keepEstrofes, occasionFileName, slideChoice, withShow } from './songs.js'
@@ -80,7 +81,7 @@ const generateReason = computed(() => {
   return reasons.join(' ')
 })
 
-const canGenerate = computed(() => !generateReason.value)
+const canGenerate = computed(() => !generateReason.value && missingFonts.value.length === 0)
 
 const chosenIds = computed(() => chosen.value.map((song) => song.id))
 
@@ -614,7 +615,7 @@ async function exportSlides(replace = false) {
     const message = e instanceof Error ? e.message : 'Não foi possível exportar os cânticos.'
     if (message.includes('ficheiro está aberto')) {
       slidesFileOpen.value = message
-    } else {
+    } else if (!(missingFonts.value.length && message.includes('Install the missing font'))) {
       slidesError.value = message
     }
   } finally {
@@ -734,7 +735,7 @@ async function generate(replace = false) {
     const message = e instanceof Error ? e.message : 'Não foi possível gerar.'
     if (message.includes('ficheiro está aberto')) {
       fileOpen.value = message
-    } else {
+    } else if (!(missingFonts.value.length && message.includes('Install the missing font'))) {
       error.value = message
     }
   } finally {
@@ -766,14 +767,6 @@ async function errorText(response) {
       </svg>
     </button>
   </nav>
-  <div v-if="missingFonts.length" class="font-banner">
-    <p>
-      Identificados tipos de letra em falta. A apresentação pode não corresponder ao modelo até os instalar:
-      <template v-for="(font, index) in missingFonts" :key="font.family">
-        <a :href="font.url" target="_blank" rel="noopener noreferrer">{{ font.family }}</a><span v-if="index < missingFonts.length - 1">, </span>
-      </template>.
-    </p>
-  </div>
   <div class="app-body">
   <main v-if="!libraryReady" class="welcome">
     <p>A abrir…</p>
@@ -868,11 +861,12 @@ async function errorText(response) {
               </button>
             </div>
           </div>
-          <button class="primary" type="button" :disabled="!slidesName.trim() || busy" @click="exportSlides()">
+          <button class="primary" type="button" :disabled="!slidesName.trim() || busy || missingFonts.length > 0" @click="exportSlides()">
             <span v-if="busy" class="spinner" aria-hidden="true"></span>
             {{ busy ? 'A gerar…' : 'Exportar' }}
           </button>
         </div>
+        <FontNotice :fonts="missingFonts" />
         <p v-if="slidesError" class="status error">{{ slidesError }}</p>
       </div>
     </div>
@@ -923,6 +917,7 @@ async function errorText(response) {
       :folder="folder"
       :draft="eucharistDraft"
       :shape="shape"
+      :fonts="missingFonts"
       @choose="chooseShape"
       @choose-folder="chooseFolder"
       @generated="savedPath = $event"
@@ -969,6 +964,7 @@ async function errorText(response) {
           </div>
         </div>
         <p v-if="folder" class="path-full">{{ folder }}</p>
+        <FontNotice :fonts="missingFonts" />
         <p v-if="error && !savedPath" class="status error">{{ error }}</p>
       </section>
       <div v-if="!loadError" class="columns list-columns">
