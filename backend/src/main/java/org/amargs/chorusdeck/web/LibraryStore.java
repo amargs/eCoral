@@ -35,7 +35,7 @@ public final class LibraryStore {
         this.seed = seed;
     }
 
-    /** Working pair for "Só neste computador", outside the program files. */
+    /** Working pair for "Neste computador", outside the program files. */
     public Path localDirectory() {
         return file.getParent().resolve("data");
     }

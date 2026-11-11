@@ -346,6 +346,19 @@ class LiturgyClientTest {
         assertEquals(1, listed.stream().filter(entry -> entry.key().equals("all-saints")).count());
         assertEquals(1, listed.stream().filter(entry -> entry.key().equals("ordinary-29/A")).count());
         assertTrue(listed.stream().anyMatch(entry -> entry.key().equals("corpus-christi/C") && entry.solemnity()));
+        for (String key : List.of(
+                "epiphany/A",
+                "baptism-of-the-lord/A",
+                "easter-7/A",
+                "pentecost/A",
+                "trinity/A",
+                "ordinary-34/A")) {
+            assertTrue(listed.stream().anyMatch(entry -> entry.key().equals(key) && entry.solemnity()), key);
+        }
+        SundayLibrary.SundayEntry pentecost = listed.stream()
+                .filter(entry -> entry.key().equals("pentecost/A")).findFirst().orElseThrow();
+        assertEquals("Solenidade do Pentecostes", pentecost.name());
+        assertEquals("pentecostes", pentecost.season());
         int endOfYearA = indexOf(listed, "ordinary-34/A");
         assertTrue(endOfYearA < indexOf(listed, "advent-1/B"));
         assertTrue(indexOf(listed, "advent-2/A") < indexOf(listed, "immaculate-conception"));
@@ -455,6 +468,19 @@ class LiturgyClientTest {
         assertEquals("Bem-aventurados os pobres", kept.evangelho().citacao());
         assertEquals("Mt 5, 1-12a", kept.evangelho().referencia());
         assertNull(library.stored(LocalDate.of(2026, 11, 1)));
+    }
+
+    @Test
+    void scriptureAbbreviationsFollowTheConference() {
+        assertEquals("1Mac 1, 1", RomanCalendar.reference("1 Macc 1:1"));
+        assertEquals("2Mac 1, 1", RomanCalendar.reference("2 Macc 1:1"));
+        assertEquals("Jb 1, 1", RomanCalendar.reference("Job 1:1"));
+        assertEquals("Co 1, 1", RomanCalendar.reference("Eccl 1:1"));
+        assertEquals("Abd 1, 1", RomanCalendar.reference("Obad 1:1"));
+        assertEquals("Flm 1, 1", RomanCalendar.reference("Phlm 1:1"));
+        assertEquals("Heb 1, 1", RomanCalendar.reference("Heb 1:1"));
+        assertEquals("1Pd 1, 1", RomanCalendar.reference("1 Pet 1:1"));
+        assertEquals("2Pd 1, 1", RomanCalendar.reference("2 Pet 1:1"));
     }
 
     private static int indexOf(List<SundayLibrary.SundayEntry> entries, String key) {

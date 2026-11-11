@@ -61,7 +61,7 @@
         "citacao" : ""
       },
       "segunda" : {
-        "referencia" : "2Pe 3, 8-14",
+        "referencia" : "2Pd 3, 8-14",
         "citacao" : ""
       },
       "salmo" : "",
@@ -108,7 +108,7 @@
       "louvor" : "Deus amou tanto o mundo\nque Lhe Deu o seu Filho Unigénito;\nQuem acredita n’Ele tem a vida eterna."
     },
     "pentecost/B" : {
-      "domingo" : "Domingo de Pentecostes",
+      "domingo" : "Solenidade do Pentecostes",
       "season" : "pentecostes",
       "primeira" : {
         "referencia" : "At 2, 1-11",
@@ -219,7 +219,7 @@
         "citacao" : ""
       },
       "segunda" : {
-        "referencia" : "Hb 5, 7-9",
+        "referencia" : "Heb 5, 7-9",
         "citacao" : ""
       },
       "salmo" : "",
@@ -268,7 +268,7 @@
       "season" : "advento",
       "cover" : "Capa - Domingo III Advento",
       "primeira" : {
-        "referencia" : "Zep 3, 14-18",
+        "referencia" : "Sf 3, 14-18",
         "citacao" : ""
       },
       "segunda" : {
@@ -408,7 +408,7 @@
         "citacao" : "A Sabedoria faz-se encontrar aos que a procuram"
       },
       "segunda" : {
-        "referencia" : "1 Tes 4, 13-18",
+        "referencia" : "1Ts 4, 13-18",
         "citacao" : "Deus levará com Jesus os que em Jesus tiverem morrido"
       },
       "salmo" : "A minha alma tem sede de Vós, meu Deus.",
@@ -459,7 +459,7 @@
         "citacao" : ""
       },
       "segunda" : {
-        "referencia" : "1Pe 3, 18-22",
+        "referencia" : "1Pd 3, 18-22",
         "citacao" : ""
       },
       "salmo" : "",
@@ -483,7 +483,7 @@
         "citacao" : "Alegrai-vos e exultai, porque é grande nos Céus a vossa recompensa"
       },
       "segunda" : {
-        "referencia" : "1 Jo 3, 1-3",
+        "referencia" : "1Jo 3, 1-3",
         "citacao" : "Veremos a Deus tal como Ele é"
       }
     },
@@ -539,7 +539,7 @@
       }
     },
     "pentecost/A" : {
-      "domingo" : "Domingo de Pentecostes",
+      "domingo" : "Solenidade do Pentecostes",
       "season" : "pentecostes",
       "primeira" : {
         "referencia" : "At 2, 1-11",

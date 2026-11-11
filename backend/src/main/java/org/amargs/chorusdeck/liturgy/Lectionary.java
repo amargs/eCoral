@@ -98,8 +98,8 @@ public final class Lectionary {
         specs.add(spec("christmas", false, "natal", false, true, null));
         specs.add(spec("holy-family", true, "natal", false, false, null));
         specs.add(fixed("mary-mother-of-god", "natal"));
-        specs.add(spec("epiphany", true, "natal", false, false, null));
-        specs.add(spec("baptism-of-the-lord", true, "natal", false, false, null));
+        specs.add(spec("epiphany", true, "natal", false, true, null));
+        specs.add(spec("baptism-of-the-lord", true, "natal", false, true, null));
         for (int number = 2; number <= 9; number++) {
             specs.add(spec("ordinary-" + number, true, "comum", false, false, null));
         }
@@ -112,9 +112,9 @@ public final class Lectionary {
         for (int number = 2; number <= 6; number++) {
             specs.add(spec("easter-" + number, true, "pascoa", false, false, null));
         }
-        specs.add(spec("easter-7", true, "pascoa", false, false, null));
-        specs.add(spec("pentecost", true, "pentecostes", false, false, null));
-        specs.add(spec("trinity", true, "comum", false, false, null));
+        specs.add(spec("easter-7", true, "pascoa", false, true, null));
+        specs.add(spec("pentecost", true, "pentecostes", false, true, null));
+        specs.add(spec("trinity", true, "comum", false, true, null));
         specs.add(spec("corpus-christi", true, "comum", false, true, null));
         specs.add(fixed("john-the-baptist", "comum"));
         specs.add(fixed("peter-paul", "comum"));
@@ -129,7 +129,7 @@ public final class Lectionary {
         for (int number = 31; number <= 33; number++) {
             specs.add(spec("ordinary-" + number, true, "comum", false, false, null));
         }
-        specs.add(spec("ordinary-34", true, "comum", false, false, null));
+        specs.add(spec("ordinary-34", true, "comum", false, true, null));
         return specs;
     }
 

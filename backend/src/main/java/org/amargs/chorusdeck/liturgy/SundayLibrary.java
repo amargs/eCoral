@@ -555,7 +555,7 @@ public final class SundayLibrary {
     static String domingo(String sundayId) {
         return switch (sundayId) {
             case "palm-sunday" -> "Domingo de Ramos";
-            case "pentecost" -> "Domingo de Pentecostes";
+            case "pentecost" -> "Solenidade do Pentecostes";
             case "easter-sunday" -> "Domingo de Páscoa";
             case "easter-7" -> "Solenidade da Ascensão do Senhor";
             case "trinity" -> "Solenidade da Santíssima Trindade";
@@ -577,7 +577,8 @@ public final class SundayLibrary {
         String automatic = numbered(sundayId);
         if (sundayId.equals(stored)
                 || (automatic.equals(stored) && !automatic.equals(title))
-                || ("holy-family".equals(sundayId) && "Domingo da Sagrada Família".equals(stored))) {
+                || ("holy-family".equals(sundayId) && "Domingo da Sagrada Família".equals(stored))
+                || ("pentecost".equals(sundayId) && "Domingo de Pentecostes".equals(stored))) {
             sunday.put("domingo", title);
             return true;
         }

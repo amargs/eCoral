@@ -53,6 +53,11 @@ const libraryMode = ref('')
 const libraryFolder = ref('')
 const libraryNote = ref('')
 const libraryBusy = ref(false)
+const libraryAction = ref('')
+const libraryKnown = ref(false)
+const libraryLoading = ref(false)
+const localLibraryButton = ref(null)
+const retryLibraryButton = ref(null)
 const importDirectory = ref('')
 const slidesOpen = ref(false)
 const slidesKind = ref('songs')
@@ -63,6 +68,11 @@ const slidesFileOpen = ref('')
 const slidesReplace = ref('')
 const syncChoice = ref('local')
 const draftFolder = ref('')
+const pendingLocal = ref(false)
+const libraryFolderInput = ref(null)
+const slidesFolderInput = ref(null)
+const importCancel = ref(null)
+const localCancel = ref(null)
 const libraryReady = ref(false)
 
 const coverReady = computed(() => Boolean(cover.layout))
@@ -87,9 +97,70 @@ const chosenIds = computed(() => chosen.value.map((song) => song.id))
 
 const folderLeaf = computed(() => propsFolderLeaf(folder.value))
 
+const libraryPlaceLine = computed(() => {
+  if (libraryMode.value === 'folder' && libraryFolder.value.trim()) {
+    const leaf = propsFolderLeaf(libraryFolder.value)
+    return leaf ? `Na pasta ${leaf}.` : 'Numa pasta partilhada.'
+  }
+  return 'Neste computador.'
+})
+
+const folderChange = computed(() => {
+  const draft = draftFolder.value.trim()
+  if (!draft) {
+    return false
+  }
+  return libraryMode.value !== 'folder' || !samePath(draft, libraryFolder.value)
+})
+
+const pendingLocalText = computed(() => {
+  const move = 'Passar os cânticos e a liturgia para este computador?'
+  return chosen.value.length ? `${move} A lista de cânticos em curso fica vazia.` : move
+})
+
+const libraryMissingText = computed(() => {
+  const place = libraryFolder.value.trim()
+  const where = place ? `em ${place}` : 'no sítio guardado'
+  return `Os cânticos e a liturgia já não estão ${where}. Escolha de novo onde ficam.`
+})
+
+const libraryStatusText = computed(() => {
+  if (libraryAction.value === 'local') return 'A guardar os cânticos neste computador.'
+  if (libraryAction.value === 'folder') return 'A escolher a pasta.'
+  if (libraryLoading.value) return 'A tentar outra vez.'
+  return ''
+})
+
+function readableError(error, fallback) {
+  if (!(error instanceof Error) || error instanceof TypeError || error instanceof SyntaxError) {
+    return fallback
+  }
+  const message = error.message.trim()
+  if (!message || /^failed to fetch$/i.test(message) || /^networkerror/i.test(message)) {
+    return fallback
+  }
+  return message
+}
+
 function propsFolderLeaf(path) {
   const parts = path.split(/[/\\]/).filter(Boolean)
   return parts.at(-1) || ''
+}
+
+function samePath(left, right) {
+  const norm = (value) => value.trim().replace(/[\\/]+$/, '').replaceAll('/', '\\').toLowerCase()
+  return norm(left) !== '' && norm(left) === norm(right)
+}
+
+function revealPathEnd(input) {
+  if (input) {
+    input.scrollLeft = input.scrollWidth
+  }
+}
+
+function stayedNote(where, hadSongs) {
+  const base = `Os cânticos e a liturgia ficam ${where}.`
+  return hadSongs ? `${base} A lista de cânticos em curso ficou vazia.` : base
 }
 
 const savedName = computed(() => {
@@ -110,6 +181,26 @@ watch(draftPrompt, (open) => {
   if (open) {
     nextTick(() => continueDraftButton.value?.focus())
   }
+})
+
+watch(importDirectory, (directory) => {
+  if (directory) {
+    nextTick(() => importCancel.value?.focus())
+  }
+})
+
+watch(pendingLocal, (open) => {
+  if (open) {
+    nextTick(() => localCancel.value?.focus())
+  }
+})
+
+watch([draftFolder, syncChoice], () => {
+  nextTick(revealOpenPaths)
+})
+
+watch(folder, () => {
+  nextTick(revealOpenPaths)
 })
 
 watch([coverOn, () => cover.domingo], () => {
@@ -172,6 +263,14 @@ watch(shape, (value) => {
   if (value === 'lista') {
     songsMounted.value = true
   }
+})
+
+watch([libraryReady, indexPath, libraryKnown], ([ready, path, known]) => {
+  if (!ready) return
+  nextTick(() => {
+    if (!known) retryLibraryButton.value?.focus()
+    else if (!path) localLibraryButton.value?.focus()
+  })
 })
 
 watch([libraryReady, indexPath, draftChecked], () => {
@@ -258,26 +357,39 @@ onMounted(() => {
   loadFonts()
   loadEucharistDraft()
   window.addEventListener('keydown', onKeydown)
+  window.addEventListener('resize', revealOpenPaths)
 })
 
 onUnmounted(() => {
   window.removeEventListener('keydown', onKeydown)
+  window.removeEventListener('resize', revealOpenPaths)
 })
 
+function revealOpenPaths() {
+  revealPathEnd(libraryFolderInput.value)
+  revealPathEnd(slidesFolderInput.value)
+}
+
 async function loadLibrary() {
+  if (libraryLoading.value) return
+  libraryLoading.value = true
+  loadError.value = ''
   try {
     const response = await fetch('/api/library')
     if (!response.ok) {
-      throw new Error(await errorText(response))
+      throw new Error('Não foi possível saber onde ficam os cânticos. Tente outra vez.')
     }
     const payload = await response.json()
     applyLibrary(payload)
+    libraryKnown.value = true
     if (payload.index) {
       await loadSongs()
     }
   } catch (e) {
-    loadError.value = e.message
+    libraryKnown.value = false
+    loadError.value = readableError(e, 'Não foi possível saber onde ficam os cânticos. Tente outra vez.')
   } finally {
+    libraryLoading.value = false
     libraryReady.value = true
   }
 }
@@ -375,8 +487,10 @@ function applyLibrary(payload) {
 }
 
 async function useLocalLibrary() {
+  if (libraryBusy.value) return
   error.value = ''
   libraryNote.value = ''
+  libraryAction.value = 'local'
   libraryBusy.value = true
   try {
     const response = await fetch('/api/library', {
@@ -386,28 +500,31 @@ async function useLocalLibrary() {
     })
     const payload = await response.json()
     if (!response.ok) {
-      throw new Error(payload.error || 'Não foi possível guardar a biblioteca neste computador.')
+      throw new Error(payload.error || 'Não foi possível guardar os cânticos e a liturgia neste computador. Tente outra vez.')
     }
     applyLibrary(payload)
     chosen.value = []
     loadError.value = ''
     await loadSongs()
   } catch (e) {
-    error.value = e instanceof Error ? e.message : 'Não foi possível guardar a biblioteca neste computador.'
+    error.value = readableError(e, 'Não foi possível guardar os cânticos e a liturgia neste computador. Tente outra vez.')
   } finally {
     libraryBusy.value = false
+    libraryAction.value = ''
   }
 }
 
 async function chooseLibraryFolder() {
+  if (libraryBusy.value) return
   error.value = ''
   libraryNote.value = ''
+  libraryAction.value = 'folder'
   libraryBusy.value = true
   try {
     const response = await fetch('/api/choose-library-folder', { method: 'POST' })
     const payload = await response.json()
     if (!response.ok) {
-      throw new Error(payload.error || 'Não foi possível escolher a pasta.')
+      throw new Error(payload.error || 'Não foi possível escolher a pasta. Tente outra vez.')
     }
     if (payload.cancelled || !payload.index) {
       return
@@ -417,9 +534,10 @@ async function chooseLibraryFolder() {
     loadError.value = ''
     await loadSongs()
   } catch (e) {
-    error.value = e instanceof Error ? e.message : 'Não foi possível escolher a pasta.'
+    error.value = readableError(e, 'Não foi possível escolher a pasta. Tente outra vez.')
   } finally {
     libraryBusy.value = false
+    libraryAction.value = ''
   }
 }
 
@@ -432,11 +550,24 @@ async function chooseSync(mode) {
     draftFolder.value = libraryFolder.value || draftFolder.value
     return
   }
-  syncChoice.value = 'local'
-  draftFolder.value = libraryFolder.value
   if (libraryMode.value !== 'local') {
-    await useLocalLibrary()
+    pendingLocal.value = true
+    return
   }
+  syncChoice.value = 'local'
+}
+
+async function confirmLocal() {
+  const hadSongs = chosen.value.length > 0
+  await useLocalLibrary()
+  pendingLocal.value = false
+  if (!error.value && libraryMode.value === 'local') {
+    libraryNote.value = stayedNote('neste computador', hadSongs)
+  }
+}
+
+function cancelLocal() {
+  pendingLocal.value = false
 }
 
 async function pickSyncFolder() {
@@ -446,22 +577,25 @@ async function pickSyncFolder() {
     const response = await fetch('/api/choose-directory', { method: 'POST' })
     const payload = await response.json()
     if (!response.ok) {
-      throw new Error(payload.error || 'Não foi possível escolher a pasta.')
+      throw new Error(payload.error || 'Não foi possível escolher a pasta. Tente outra vez.')
     }
     if (payload.directory) {
       draftFolder.value = payload.directory
     }
   } catch (e) {
-    error.value = e instanceof Error ? e.message : 'Não foi possível escolher a pasta.'
+    error.value = readableError(e, 'Não foi possível escolher a pasta. Tente outra vez.')
   }
 }
 
 async function applySyncFolder() {
-  if (!draftFolder.value) {
+  if (!folderChange.value || libraryBusy.value) {
     return
   }
+  const hadSongs = chosen.value.length > 0
+  const where = draftFolder.value.trim()
   error.value = ''
   libraryNote.value = ''
+  libraryAction.value = 'apply'
   libraryBusy.value = true
   try {
     const response = await fetch('/api/library', {
@@ -471,33 +605,41 @@ async function applySyncFolder() {
     })
     const payload = await response.json()
     if (!response.ok) {
-      throw new Error(payload.error || 'Não foi possível usar essa pasta.')
+      throw new Error(payload.error || 'Não foi possível usar essa pasta. Escolha outra, ou tente outra vez.')
     }
     applyLibrary(payload)
     chosen.value = []
     loadError.value = ''
     await loadSongs()
+    libraryNote.value = stayedNote(`em ${where}`, hadSongs)
   } catch (e) {
-    error.value = e instanceof Error ? e.message : 'Não foi possível usar essa pasta.'
+    error.value = readableError(e, 'Não foi possível usar essa pasta. Escolha outra, ou tente outra vez.')
   } finally {
     libraryBusy.value = false
+    libraryAction.value = ''
   }
 }
 
 async function chooseImportFolder() {
+  if (libraryBusy.value) {
+    return
+  }
   error.value = ''
   libraryNote.value = ''
+  libraryBusy.value = true
   try {
     const response = await fetch('/api/choose-import-folder', { method: 'POST' })
     const payload = await response.json()
     if (!response.ok) {
-      throw new Error(payload.error || 'Não foi possível escolher a pasta.')
+      throw new Error(payload.error || 'Não foi possível escolher a pasta. Tente outra vez.')
     }
     if (payload.directory) {
       importDirectory.value = payload.directory
     }
   } catch (e) {
-    error.value = e instanceof Error ? e.message : 'Não foi possível escolher a pasta.'
+    error.value = readableError(e, 'Não foi possível escolher a pasta. Tente outra vez.')
+  } finally {
+    libraryBusy.value = false
   }
 }
 
@@ -507,6 +649,7 @@ function cancelImport() {
 
 async function confirmImport() {
   const directory = importDirectory.value
+  const hadSongs = chosen.value.length > 0
   importDirectory.value = ''
   error.value = ''
   libraryNote.value = ''
@@ -518,15 +661,16 @@ async function confirmImport() {
     })
     const payload = await response.json()
     if (!response.ok) {
-      throw new Error(payload.error || 'Não foi possível importar a biblioteca.')
+      throw new Error(payload.error || 'Não foi possível substituir os cânticos e a liturgia. Tente outra vez.')
     }
     applyLibrary(payload)
     chosen.value = []
     loadError.value = ''
     await loadSongs()
-    libraryNote.value = 'A biblioteca foi substituída pelos ficheiros dessa pasta.'
+    const replaced = `Os cânticos e a liturgia foram substituídos pelos ficheiros de ${directory}.`
+    libraryNote.value = hadSongs ? `${replaced} A lista de cânticos em curso ficou vazia.` : replaced
   } catch (e) {
-    error.value = e instanceof Error ? e.message : 'Não foi possível importar a biblioteca.'
+    error.value = readableError(e, 'Não foi possível substituir os cânticos e a liturgia. Tente outra vez.')
   }
 }
 
@@ -626,19 +770,25 @@ async function exportSlides(replace = false) {
 }
 
 async function exportLibrary() {
+  if (libraryBusy.value) {
+    return
+  }
   error.value = ''
   libraryNote.value = ''
+  libraryBusy.value = true
   try {
     const response = await fetch('/api/choose-export-folder', { method: 'POST' })
     const payload = await response.json()
     if (!response.ok) {
-      throw new Error(payload.error || 'Não foi possível exportar a biblioteca.')
+      throw new Error(payload.error || 'Não foi possível copiar os cânticos e a liturgia. Tente outra vez.')
     }
     if (payload.directory) {
-      libraryNote.value = 'A biblioteca foi copiada para essa pasta.'
+      libraryNote.value = `Os cânticos e a liturgia foram copiados para ${payload.directory}.`
     }
   } catch (e) {
-    error.value = e instanceof Error ? e.message : 'Não foi possível exportar a biblioteca.'
+    error.value = readableError(e, 'Não foi possível copiar os cânticos e a liturgia. Tente outra vez.')
+  } finally {
+    libraryBusy.value = false
   }
 }
 
@@ -771,73 +921,100 @@ async function errorText(response) {
   </nav>
   <div class="app-body">
   <main v-if="!libraryReady" class="welcome">
-    <p>A abrir…</p>
+    <p role="status">A abrir…</p>
   </main>
-  <main v-else-if="!indexPath" class="welcome">
+  <main v-else-if="!libraryKnown" class="welcome" :aria-busy="libraryLoading || undefined">
     <h1>Onde ficam os cânticos</h1>
-    <p v-if="indexMissing">A biblioteca guardada já não está nesse sítio.</p>
-    <p>O eCoral já vem com um índice de cânticos e a liturgia de alguns Domingos e solenidades. Onde ficam as alterações?</p>
-    <div class="choice-row">
-      <button class="choice compact" type="button" :disabled="libraryBusy" @click="useLocalLibrary">
-        <strong>Só neste computador</strong>
-        <span>As alterações ficam persistidas apenas localmente, na pasta pré-definida.</span>
-      </button>
-      <button class="choice compact" type="button" :disabled="libraryBusy" @click="chooseLibraryFolder">
-        <strong>Sincronizar noutra pasta</strong>
-        <span>Escolher outra pasta para guardar as alterações (por ex. uma pasta partilhada na Dropbox).</span>
-      </button>
-    </div>
-    <p v-if="error" class="status error">{{ error }}</p>
+    <p class="welcome-alert" role="alert">{{ loadError || 'Não foi possível saber onde ficam os cânticos. Tente outra vez.' }}</p>
+    <button ref="retryLibraryButton" class="primary welcome-primary" type="button" :disabled="libraryLoading" @click="loadLibrary">
+      <span v-if="libraryLoading" class="spinner" aria-hidden="true"></span>
+      {{ libraryLoading ? 'A tentar…' : 'Tentar outra vez' }}
+    </button>
+    <p v-if="libraryStatusText" class="welcome-status" role="status">{{ libraryStatusText }}</p>
   </main>
-  <main v-else-if="indexPath && screen === 'config'" class="page">
+  <main v-else-if="!indexPath" class="welcome" :aria-busy="libraryBusy || undefined">
+    <h1>Onde ficam os cânticos</h1>
+    <p v-if="indexMissing" class="welcome-alert" role="alert">{{ libraryMissingText }}</p>
+    <p v-if="loadError" class="welcome-alert" role="alert">{{ loadError }}</p>
+    <p>O eCoral já vem com os cânticos e a liturgia de alguns Domingos e solenidades.</p>
+    <div class="welcome-actions">
+      <button ref="localLibraryButton" class="primary welcome-primary" type="button" :disabled="libraryBusy" @click="useLocalLibrary">
+        <span v-if="libraryAction === 'local'" class="spinner" aria-hidden="true"></span>
+        {{ libraryAction === 'local' ? 'A guardar…' : 'Neste computador' }}
+      </button>
+      <div class="welcome-folder">
+        <button class="welcome-secondary" type="button" :disabled="libraryBusy" aria-describedby="library-folder-note" @click="chooseLibraryFolder">
+          {{ libraryAction === 'folder' ? 'A escolher…' : 'Numa pasta partilhada' }}
+        </button>
+        <p id="library-folder-note" class="welcome-aside">Os cânticos e a liturgia que já estejam nessa pasta mantêm-se. Fechar a janela volta aqui.</p>
+      </div>
+    </div>
+    <p v-if="error" class="welcome-alert" role="alert">{{ error }}</p>
+    <p class="welcome-later">Pode mudar isto mais tarde, em Configuração.</p>
+    <p v-if="libraryStatusText" class="welcome-status" role="status">{{ libraryStatusText }}</p>
+  </main>
+  <main v-else-if="indexPath && screen === 'config'" class="page config-page">
     <header class="config-header">
       <h1>Configuração</h1>
     </header>
-    <h2 class="config-title">Índice de cânticos e Domingos</h2>
     <section class="panel">
       <div class="config-fields">
-        <h3 class="config-heading">Sincronização</h3>
-        <p class="config-hint">As alterações podem ficar só neste computador, ou numa pasta que partilhe com os outros, por exemplo na Dropbox.</p>
+        <h2 class="config-heading">Onde ficam os cânticos e a liturgia</h2>
+        <p class="config-place">{{ libraryPlaceLine }}</p>
+        <p v-if="libraryMode === 'folder' && libraryFolder" class="config-path">{{ libraryFolder }}</p>
+        <p class="config-hint">A pasta partilhada, por exemplo na Dropbox, é a mesma para quem prepara noutro computador.</p>
         <div class="kind">
           <label>
             <input type="radio" name="sync" value="local" :checked="syncChoice === 'local'" :disabled="libraryBusy" @change="chooseSync('local')" />
-            <span>Local</span>
+            <span>Neste computador</span>
           </label>
           <label>
             <input type="radio" name="sync" value="folder" :checked="syncChoice === 'folder'" :disabled="libraryBusy" @change="chooseSync('folder')" />
-            <span>Outra pasta neste dispositivo</span>
+            <span>Numa pasta partilhada</span>
           </label>
         </div>
         <div v-if="syncChoice === 'folder'" class="field">
-          <span>Pasta</span>
+          <label for="library-folder">Pasta partilhada</label>
           <div class="sync-apply">
             <div class="path-row">
-              <input :value="draftFolder" type="text" readonly placeholder="Nenhuma pasta escolhida" />
+              <input id="library-folder" ref="libraryFolderInput" :value="draftFolder" :title="draftFolder || undefined" type="text" readonly placeholder="Nenhuma pasta escolhida" />
               <button class="browse" type="button" title="Escolher pasta" aria-label="Escolher pasta" :disabled="libraryBusy" @click="pickSyncFolder">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                   <path d="M3 7.5A1.5 1.5 0 0 1 4.5 6H9l2 2h8.5A1.5 1.5 0 0 1 21 9.5v8A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5v-10z" />
                 </svg>
               </button>
             </div>
-            <button class="primary" type="button" :disabled="!draftFolder || libraryBusy" @click="applySyncFolder">Aplicar</button>
+            <button class="primary" type="button" :disabled="!folderChange || libraryBusy" :aria-describedby="folderChange ? 'apply-note' : undefined" @click="applySyncFolder">
+              <span v-if="libraryAction === 'apply'" class="spinner" aria-hidden="true"></span>
+              {{ libraryAction === 'apply' ? 'A guardar…' : 'Aplicar' }}
+            </button>
           </div>
+          <p v-if="folderChange" id="apply-note" class="config-hint">Aplicar passa a usar esta pasta. A lista de cânticos em curso fica vazia.</p>
+          <p v-else-if="draftFolder.trim()" class="config-hint">Esta pasta já está em uso.</p>
+          <p v-else class="config-hint">Escolha a pasta. Aplicar passa a usá-la, e a lista de cânticos em curso fica vazia.</p>
         </div>
-        <h3 class="config-heading">Importar/exportar</h3>
-        <p class="config-hint">Importar substitui os índices que estão a ser utilizados por uma cópia de outra pasta. Exportar guarda uma cópia dos índices atuais.</p>
+        <h3 class="config-heading">Cópia</h3>
+        <p class="config-hint">Substituir troca os cânticos e a liturgia em uso. A cópia deixa-os como estão.</p>
         <div class="config-actions">
-          <button type="button" @click="chooseImportFolder">Importar</button>
-          <button type="button" @click="exportLibrary">Exportar</button>
+          <button type="button" :disabled="libraryBusy" @click="exportLibrary">Exportar uma cópia</button>
+          <button type="button" class="text-action" :disabled="libraryBusy" @click="chooseImportFolder">Substituir</button>
         </div>
-        <h3 class="config-heading">Diapositivos</h3>
-        <p class="config-hint">Exportar uma apresentação com todos os cânticos configurados.</p>
-        <p class="config-hint">Ou uma apresentação com todas as capas, cada uma com um texto de exemplo.</p>
-        <div class="config-actions">
-          <button type="button" @click="openSlides">Exportar todos os cânticos</button>
-          <button type="button" @click="openCovers">Exportar todas as capas</button>
-        </div>
+        <details class="config-more">
+          <summary class="config-heading">Apresentações de referência</summary>
+          <div class="config-deck">
+            <div>
+              <p class="config-hint">Os cânticos tal como estão configurados, numa apresentação.</p>
+              <button type="button" :disabled="libraryBusy" @click="openSlides">Exportar todos os cânticos</button>
+            </div>
+            <div>
+              <p class="config-hint">Cada capa, com um texto de exemplo, numa apresentação.</p>
+              <button type="button" :disabled="libraryBusy" @click="openCovers">Exportar todas as capas</button>
+            </div>
+          </div>
+        </details>
       </div>
-      <p v-if="libraryNote" class="status">{{ libraryNote }}</p>
-      <p v-if="error" class="status error">{{ error }}</p>
+      <p class="status" :class="{ 'is-empty': !libraryNote }" role="status">{{ libraryNote }}</p>
+      <p class="status error" :class="{ 'is-empty': !error }" role="alert">{{ error }}</p>
     </section>
     <div v-if="slidesOpen" class="modal-backdrop" @click.self="closeSlides">
       <div class="modal slides-export" role="dialog" aria-modal="true" aria-labelledby="export-slides" @keydown.esc="closeSlides">
@@ -853,9 +1030,9 @@ async function errorText(response) {
             <input ref="slidesInput" v-model="slidesName" type="text" />
           </label>
           <div class="field">
-            <span>Pasta</span>
+            <label for="slides-folder">Pasta da apresentação</label>
             <div class="path-row">
-              <input :value="folder" type="text" readonly placeholder="Nenhuma pasta escolhida" />
+              <input id="slides-folder" ref="slidesFolderInput" :value="folder" :title="folder || undefined" type="text" readonly placeholder="Nenhuma pasta escolhida" />
               <button class="browse" type="button" title="Escolher pasta" aria-label="Escolher pasta" @click="chooseSlidesFolder">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                   <path d="M3 7.5A1.5 1.5 0 0 1 4.5 6H9l2 2h8.5A1.5 1.5 0 0 1 21 9.5v8A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5v-10z" />
@@ -869,7 +1046,7 @@ async function errorText(response) {
           </button>
         </div>
         <FontNotice :fonts="missingFonts" />
-        <p v-if="slidesError" class="status error">{{ slidesError }}</p>
+        <p v-if="slidesError" class="status error" role="alert">{{ slidesError }}</p>
       </div>
     </div>
     <div v-if="slidesFileOpen" class="modal-backdrop" @click.self="slidesFileOpen = ''">
@@ -882,7 +1059,7 @@ async function errorText(response) {
     </div>
     <div v-if="slidesReplace" class="modal-backdrop" @click.self="slidesReplace = ''">
       <div class="modal confirm" role="dialog" aria-modal="true" aria-labelledby="replace-slides">
-        <p id="replace-slides">Já existe um ficheiro com o nome {{ slidesReplace }}. Quer substituí-lo?</p>
+        <p id="replace-slides">Já existe um ficheiro com o nome {{ slidesReplace }}. Substituí-lo apaga o que lá está.</p>
         <div class="open-actions">
           <button type="button" @click="slidesReplace = ''; nextTick(() => { slidesInput?.focus(); slidesInput?.select() })">Escolher outro nome</button>
           <button class="primary" type="button" @click="exportSlides(true)">Substituir</button>
@@ -890,11 +1067,23 @@ async function errorText(response) {
       </div>
     </div>
     <div v-if="importDirectory" class="modal-backdrop" @click.self="cancelImport">
-      <div class="modal confirm" role="dialog" aria-modal="true" aria-labelledby="import-library">
-        <p id="import-library">Substituir os cânticos e a liturgia pelos ficheiros dessa pasta?</p>
+      <div class="modal confirm" role="dialog" aria-modal="true" aria-labelledby="import-library" @keydown.esc="cancelImport">
+        <p id="import-library">Substituir os cânticos e a liturgia em uso pelos ficheiros de {{ importDirectory }}? Esta troca não se desfaz.</p>
         <div class="open-actions">
-          <button type="button" @click="cancelImport">Cancelar</button>
-          <button class="primary" type="button" @click="confirmImport">Importar</button>
+          <button ref="importCancel" type="button" @click="cancelImport">Cancelar</button>
+          <button class="primary" type="button" @click="confirmImport">Substituir</button>
+        </div>
+      </div>
+    </div>
+    <div v-if="pendingLocal" class="modal-backdrop" @click.self="cancelLocal">
+      <div class="modal confirm" role="dialog" aria-modal="true" aria-labelledby="move-local" @keydown.esc="cancelLocal">
+        <p id="move-local">{{ pendingLocalText }}</p>
+        <div class="open-actions">
+          <button ref="localCancel" type="button" :disabled="libraryBusy" @click="cancelLocal">Cancelar</button>
+          <button class="primary" type="button" :disabled="libraryBusy" @click="confirmLocal">
+            <span v-if="libraryAction === 'local'" class="spinner" aria-hidden="true"></span>
+            {{ libraryAction === 'local' ? 'A guardar…' : 'Neste computador' }}
+          </button>
         </div>
       </div>
     </div>
@@ -1035,3 +1224,4 @@ async function errorText(response) {
   </div>
   </div>
 </template>
+
