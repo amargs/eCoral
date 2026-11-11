@@ -17,6 +17,9 @@ const displaySongs = ref(props.songs)
 const holdEmpty = ref(false)
 const emptyEntering = ref(false)
 const arrivingIds = ref([])
+const leavingIds = ref([])
+const leavingOffsets = ref({})
+const leavingFloat = ref(false)
 const live = new Set()
 const rowMoves = new Set()
 let flight = 0
@@ -38,6 +41,8 @@ watch(() => props.songs, (songs, previous) => {
   }
   releaseArrivals()
   cancelRowMoves()
+  leavingIds.value = []
+  leavingFloat.value = false
   const token = ++flight
   if (before === 0 && after > 0) {
     lockStage()
@@ -52,6 +57,26 @@ watch(() => props.songs, (songs, previous) => {
     holdEmpty.value = false
     emptyEntering.value = true
     settleDepart(token)
+    return
+  }
+  if (after < before) {
+    const reduced = prefersReduced()
+    const tops = rowTops()
+    const offsets = {}
+    for (const row of list.value?.querySelectorAll('.chosen-song') ?? []) {
+      offsets[row.dataset.id] = {
+        top: row.offsetTop,
+        left: row.offsetLeft,
+        width: row.offsetWidth,
+      }
+    }
+    const nextIds = new Set(songs.map((song) => song.id))
+    leavingIds.value = previous.filter((song) => !nextIds.has(song.id)).map((song) => song.id)
+    leavingOffsets.value = offsets
+    leavingFloat.value = !reduced
+    if (leavingIds.value.includes(estrofesOpen.value)) estrofesOpen.value = null
+    displaySongs.value = previous
+    settleRemove(token, tops)
     return
   }
   holdEmpty.value = false
@@ -128,6 +153,20 @@ function cancelRowMoves() {
   rowMoves.clear()
 }
 
+function songIndex(song) {
+  return props.songs.findIndex((item) => item.id === song.id)
+}
+
+function leavingStyle(id) {
+  if (!leavingFloat.value || !leavingIds.value.includes(id)) return undefined
+  const place = leavingOffsets.value[String(id)]
+  if (!place) return undefined
+  return {
+    top: `${place.top}px`,
+    left: `${place.left}px`,
+    width: `${place.width}px`,
+  }
+}
 function showEstrofes(id) {
   estrofesOpen.value = estrofesOpen.value === id ? null : id
 }
@@ -179,6 +218,62 @@ async function settleAppend(token) {
     cancelLive()
     clearWillChange()
   }
+}
+
+async function settleRemove(token, tops) {
+  try {
+    await nextTick()
+    if (token !== flight) return
+    await Promise.all([fadeLeaving(), slideRemaining(tops)])
+  } catch {
+    // A newer change cancelled this flight.
+  } finally {
+    if (token !== flight) return
+    leavingIds.value = []
+    leavingFloat.value = false
+    displaySongs.value = props.songs
+    await nextTick()
+    if (token !== flight) return
+    cancelLive()
+    clearWillChange()
+  }
+}
+
+async function fadeLeaving() {
+  const rows = [...(list.value?.querySelectorAll('.chosen-song.is-leaving') ?? [])]
+  if (!rows.length) return
+  const duration = prefersReduced() ? 160 : 240
+  await Promise.all(rows.map((row) => {
+    row.style.willChange = 'opacity'
+    return track(row.animate(
+      [{ opacity: 1 }, { opacity: 0 }],
+      { duration, easing: ease, fill: 'forwards' },
+    )).finished
+  }))
+}
+
+function slideRemaining(tops) {
+  if (prefersReduced() || !list.value) return Promise.resolve()
+  const animations = []
+  for (const row of list.value.querySelectorAll('.chosen-song:not(.is-leaving)')) {
+    const previousTop = tops.get(row.dataset.id)
+    if (previousTop == null) continue
+    const delta = previousTop - row.getBoundingClientRect().top
+    if (Math.abs(delta) < 0.5) continue
+    row.classList.add('is-sliding')
+    row.style.willChange = 'transform'
+    const animation = row.animate(
+      [{ transform: `translateY(${delta}px)` }, { transform: 'translateY(0px)' }],
+      { duration: 240, easing: ease },
+    )
+    rowMoves.add(animation)
+    animations.push(animation.finished.finally(() => {
+      rowMoves.delete(animation)
+      row.classList.remove('is-sliding')
+      row.style.willChange = ''
+    }))
+  }
+  return Promise.all(animations)
 }
 
 async function fadeArrivals() {
@@ -377,38 +472,50 @@ async function runDepart() {
       :class="{ arriving: holdEmpty, 'songs-departing': emptyEntering }"
       :aria-hidden="emptyEntering ? 'true' : undefined"
     >
-      <li v-for="(song, index) in displaySongs" :key="song.id" :data-id="song.id" class="chosen-song" :class="{ 'is-arriving': arrivingIds.includes(song.id) }">
+      <li
+        v-for="song in displaySongs"
+        :key="song.id"
+        :data-id="song.id"
+        class="chosen-song"
+        :class="{
+          'is-arriving': arrivingIds.includes(song.id),
+          'is-leaving': leavingIds.includes(song.id),
+          'is-leaving-float': leavingFloat && leavingIds.includes(song.id),
+        }"
+        :style="leavingStyle(song.id)"
+        :aria-hidden="leavingIds.includes(song.id) ? 'true' : undefined"
+      >
         <div class="chosen-body">
           <span class="song-label">
             <span class="book-badge">{{ song.bookId || '#' }}</span>
             <span class="song-name">
               <span>{{ song.title }}</span>
-              <span class="choice-tokens">
-                <SongShow :song="song" @change="emit('show', index, $event)" />
-                <Estrofes
-                  compact
-                  :song="song"
-                  :open="estrofesOpen === song.id"
-                  @open="showEstrofes(song.id)"
-                  @close="estrofesOpen = null"
-                  @change="emit('show', index, $event)"
-                />
-              </span>
             </span>
           </span>
         </div>
+        <span class="choice-tokens">
+          <SongShow :song="song" @change="emit('show', songIndex(song), $event)" />
+          <Estrofes
+            compact
+            :song="song"
+            :open="estrofesOpen === song.id"
+            @open="showEstrofes(song.id)"
+            @close="estrofesOpen = null"
+            @change="emit('show', songIndex(song), $event)"
+          />
+        </span>
         <span class="row-actions">
-          <button type="button" class="icon" :aria-label="songControlName('Subir', song)" :title="songControlName('Subir', song)" :disabled="index === 0" @click="emit('up', index)">
+          <button type="button" class="icon" :aria-label="songControlName('Subir', song)" :title="songControlName('Subir', song)" :disabled="songIndex(song) <= 0" @click="emit('up', songIndex(song))">
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="M12 19V5M6 11l6-6 6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
             </svg>
           </button>
-          <button type="button" class="icon" :aria-label="songControlName('Descer', song)" :title="songControlName('Descer', song)" :disabled="index === displaySongs.length - 1" @click="emit('down', index)">
+          <button type="button" class="icon" :aria-label="songControlName('Descer', song)" :title="songControlName('Descer', song)" :disabled="songIndex(song) < 0 || songIndex(song) === songs.length - 1" @click="emit('down', songIndex(song))">
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="M12 5v14M6 13l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
             </svg>
           </button>
-          <button type="button" class="icon row-remove" :aria-label="songControlName('Retirar', song)" :title="songControlName('Retirar', song)" @click="emit('remove', index)">
+          <button type="button" class="icon row-remove" :aria-label="songControlName('Retirar', song)" :title="songControlName('Retirar', song)" :disabled="songIndex(song) < 0" @click="emit('remove', songIndex(song))">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
               <path d="M6 6l12 12M18 6 6 18" />
             </svg>

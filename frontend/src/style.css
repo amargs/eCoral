@@ -1529,8 +1529,27 @@ button.choice-token[aria-expanded="true"] {
   flex-wrap: wrap;
 }
 
+.chosen-song .choice-tokens {
+  flex-wrap: nowrap;
+  max-width: none;
+}
+
 .chosen-song.is-sliding {
   position: relative;
+  z-index: 1;
+  background: #fff;
+}
+
+.chosen-stage > .songs {
+  position: relative;
+}
+
+.chosen-song.is-leaving {
+  pointer-events: none;
+}
+
+.chosen-song.is-leaving-float {
+  position: absolute;
   z-index: 1;
   background: #fff;
 }
@@ -2411,12 +2430,11 @@ button.icon.drag-handle:active {
   min-height: 0;
 }
 
-.chosen-song .song-name {
-  min-height: calc(1.4em + 0.78rem * 1.25);
-}
-
-.chosen-song .song-name:has(.choice-token) {
-  justify-content: center;
+.chosen-song .song-name > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .chosen-detail {
